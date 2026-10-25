@@ -7,6 +7,7 @@ export type ProposedAction = {
   args: Record<string, unknown>;
   requiresConfirmation: boolean;
   state: 'proposed' | 'approved' | 'committed' | 'failed' | 'rejected';
+  result?: string;
 };
 
 export type KippTurn = {
@@ -23,6 +24,7 @@ export type Message = {
   role: 'user' | 'assistant';
   content: string;
   emotion?: Emotion;
+  actions?: ProposedAction[];
   createdAt: string;
 };
 
@@ -65,6 +67,7 @@ export type Reminder = {
   timezone: string;
   recurrence?: string;
   enabled: boolean;
+  notificationId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -73,6 +76,8 @@ export type ConnectedAccount = {
   id: string;
   provider: 'google';
   externalUserId?: string;
+  email?: string;
+  name?: string;
   scopes: string[];
   status: 'connected' | 'expired' | 'disconnected';
   lastSyncAt?: string;
@@ -116,4 +121,14 @@ export type SyncOutboxItem = {
   attempts: number;
   nextRetryAt: string;
   createdAt: string;
+};
+
+export type CalendarEvent = {
+  id: string;
+  title: string;
+  start: string; // ISO
+  end?: string;
+  allDay: boolean;
+  location?: string;
+  htmlLink?: string;
 };

@@ -1,152 +1,304 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch } from 'react-native';
-import { colors, spacing } from '../../src/constants/tokens';
-import { Card, SectionTitle } from '../../src/components/ui/primitives';
-import { useAppStore } from '../../src/stores/appStore';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, Alert, Platform, Share } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { notifications } from '../../src/lib/notifications';
+import * as Speech from 'expo-speech';
+import { colors, fonts, spacing } from '../../src/constants/tokens';
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, ListItem, Screen, SegmentedControl, Separator, Switch, Text, type IconName } from '../../src/components/ui';
+import { getApiKey, setApiKey } from '../../src/lib/secrets';
+import { testConnection, KippError } from '../../src/lib/kipp';
+import type { UserProfile } from '../../src/types';
+import { connectGoogle, disconnectGoogle, googleUnavailableReason } from '../../src/lib/google';
+import { syncGoogle } from '../../src/lib/sync';
+import { useAppStore, DEFAULT_LLM } from '../../src/stores/appStore';
+
+const sections = [
+  { value: 'memories', label: 'Memory' },
+  { value: 'apps', label: 'Apps' },
+  { value: 'devices', label: 'Devices' },
+  { value: 'settings', label: 'Settings' },
+] as const;
 
 export default function YouScreen() {
   const user = useAppStore((s) => s.user);
   const setUser = useAppStore((s) => s.setUser);
-  const accounts = useAppStore((s) => s.accounts);
-  const setAccounts = useAppStore((s) => s.setAccounts);
   const memories = useAppStore((s) => s.memories);
   const setMemories = useAppStore((s) => s.setMemories);
   const device = useAppStore((s) => s.device);
   const voiceEnabled = useAppStore((s) => s.voiceEnabled);
   const setVoiceEnabled = useAppStore((s) => s.setVoiceEnabled);
   const memoryEnabled = user?.memoryEnabled ?? true;
-  const [section, setSection] = useState<'memories' | 'apps' | 'devices' | 'settings'>('memories');
+  const params = useLocalSearchParams<{ section?: string }>();
+  const sectionFromParam = sections.find((x) => x.value === params.section)?.value;
+  const [section, setSection] = useState<(typeof sections)[number]['value']>(sectionFromParam ?? 'memories');
+  // Follow deep links like /you?section=settings when the param changes.
+  const [lastParam, setLastParam] = useState(params.section);
+  if (params.section !== lastParam) {
+    setLastParam(params.section);
+    if (sectionFromParam) setSection(sectionFromParam);
+  }
+  const name = user?.displayName || 'KIPP user';
+
+  const cycle = <K extends 'responseStyle' | 'personality'>(key: K, options: UserProfile[K][]) => {
+    if (!user) return;
+    const next = options[(options.indexOf(user[key]) + 1) % options.length];
+    setUser({ ...user, [key]: next });
+  };
+
+  const exportData = async () => {
+    const { user: u, tasks, reminders, memories: mems, messages } = useAppStore.getState();
+    const json = JSON.stringify({ exportedAt: new Date().toISOString(), user: u, tasks, reminders, memories: mems, messages }, null, 2);
+    await Share.share({ title: 'KIPP data export', message: json });
+  };
+
+  const deleteAll = async () => {
+    await notifications()?.cancelAllScheduledNotificationsAsync().catch(() => {});
+    Speech.stop();
+    await setApiKey(null);
+    await disconnectGoogle();
+    useAppStore.getState().reset();
+    router.replace('/onboarding');
+  };
+  const confirmDeleteAll = () => {
+    if (Platform.OS === 'web') { deleteAll(); return; }
+    Alert.alert('Delete all data?', 'This removes your profile, tasks, reminders, memories, chat history and API key from this device.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: deleteAll },
+    ]);
+  };
 
   const toggleMemory = (id: string) => {
     setMemories(memories.map((m) => m.id === id ? { ...m, deletedAt: m.deletedAt ? undefined : new Date().toISOString() } : m));
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120 }}>
-      <View style={{ marginBottom: spacing.lg }}>
-        <Text style={{ color: colors.text, fontSize: 28, fontWeight: '700' }}>You</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 2 }}>{user?.displayName || 'KIPP user'} · {user?.timezone || 'UTC'}</Text>
+    <Screen>
+      <View style={styles.profile}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{name.trim().charAt(0).toUpperCase()}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text variant="h1">{name}</Text>
+          <Text variant="bodySm" tone="muted" style={{ marginTop: 2 }}>{user?.timezone || 'UTC'}</Text>
+        </View>
       </View>
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
-        {(['memories', 'apps', 'devices', 'settings'] as const).map((t) => (
-          <TouchableOpacity key={t} onPress={() => setSection(t)} style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 16, backgroundColor: section === t ? colors.accent : colors.surface2 }}>
-            <Text style={{ color: section === t ? colors.bg : colors.textMuted, fontWeight: '600', fontSize: 13, textTransform: 'capitalize' }}>{t}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <SegmentedControl options={sections} value={section} onChange={setSection} />
 
       {section === 'memories' && (
         <Card>
-          <SectionTitle title="Memories" subtitle="What KIPP knows about you" />
+          <CardHeader title="Memories" description="What KIPP knows about you" />
+          <Separator />
+          <ListItem icon="memory" title="Memory enabled" description="KIPP can save things you ask it to remember." trailing={<Switch value={memoryEnabled} accessibilityLabel="Memory enabled" onValueChange={(v) => setUser(user ? { ...user, memoryEnabled: v } : user)} />} />
+          <Separator />
           {memories.length === 0 ? (
-            <View style={{ paddingVertical: spacing.xl }}>
-              <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: 'center' }}>Nothing saved yet. Say remember that in Talk.</Text>
-            </View>
+            <Empty icon="memory" title="Nothing saved yet" description={'Say "remember that…" in Talk.'} />
           ) : (
-            memories.map((m) => (
-              <View key={m.id} style={{ paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderSoft, opacity: m.deletedAt ? 0.4 : 1 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2 }}>{m.category.toUpperCase()}{m.sensitive ? ' · SENSITIVE' : ''}</Text>
-                    <Text style={{ color: colors.text, fontSize: 14 }}>{m.text}</Text>
-                    <Text style={{ color: colors.textDim, fontSize: 11, marginTop: 4 }}>{new Date(m.createdAt).toLocaleDateString()} · {m.explicit ? 'explicit' : 'suggested'}</Text>
+            memories.map((m, i) => (
+              <React.Fragment key={m.id}>
+                {i > 0 && <Separator inset={spacing.lg} />}
+                <View style={[styles.memory, m.deletedAt ? { opacity: 0.45 } : null]}>
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                      <Badge label={m.category} variant="outline" />
+                      {m.sensitive ? <Badge label="Sensitive" variant="warning" /> : null}
+                    </View>
+                    <Text variant="bodySm">{m.text}</Text>
+                    <Text variant="caption" tone="muted">{new Date(m.createdAt).toLocaleDateString()} · {m.explicit ? 'explicit' : 'suggested'}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => toggleMemory(m.id)} style={{ marginLeft: spacing.md }}>
-                    <Text style={{ color: m.deletedAt ? colors.success : colors.danger, fontSize: 12, fontWeight: '600' }}>{m.deletedAt ? 'Restore' : 'Forget'}</Text>
-                  </TouchableOpacity>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    icon={m.deletedAt ? 'restore' : 'trash'}
+                    accessibilityLabel={m.deletedAt ? 'Restore memory' : 'Forget memory'}
+                    onPress={() => toggleMemory(m.id)}
+                  />
                 </View>
-              </View>
+              </React.Fragment>
             ))
           )}
-          <View style={{ marginTop: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ color: colors.text, fontSize: 14 }}>Memory enabled</Text>
-            <Switch value={memoryEnabled} onValueChange={(v) => setUser(user ? { ...user, memoryEnabled: v } : user)} trackColor={{ false: colors.surface2, true: colors.accent }} thumbColor={colors.text} />
-          </View>
         </Card>
       )}
 
-      {section === 'apps' && (
-        <Card>
-          <SectionTitle title="Connected apps" subtitle="Google Calendar & Tasks" />
-          {accounts.length === 0 ? (
-            <View style={{ paddingVertical: spacing.xl, alignItems: 'center' }}>
-              <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: 'center', marginBottom: spacing.md }}>No accounts connected.</Text>
-              <TouchableOpacity onPress={() => setAccounts([{ id: 'g1', provider: 'google', scopes: ['calendar.readonly'], status: 'connected', selectedCalendars: ['primary'], selectedTaskLists: [] }])} style={{ backgroundColor: colors.accent, borderRadius: 12, paddingVertical: spacing.sm, paddingHorizontal: spacing.xl }}>
-                <Text style={{ color: colors.bg, fontWeight: '600' }}>Connect Google (demo)</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            accounts.map((a) => (
-              <View key={a.id} style={{ paddingVertical: spacing.md }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <View>
-                    <Text style={{ color: colors.text, fontSize: 15, fontWeight: '600' }}>Google</Text>
-                    <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>{a.status} · {a.scopes.join(', ')}</Text>
-                    {a.lastSyncAt && <Text style={{ color: colors.textDim, fontSize: 11, marginTop: 2 }}>Last sync {new Date(a.lastSyncAt).toLocaleString()}</Text>}
-                  </View>
-                  <TouchableOpacity onPress={() => setAccounts(accounts.filter((x) => x.id !== a.id))}>
-                    <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '600' }}>Disconnect</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={{ marginTop: spacing.md }}>
-                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>Selected calendars: {a.selectedCalendars.join(', ') || 'none'}</Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>Selected task lists: {a.selectedTaskLists.join(', ') || 'none'}</Text>
-                </View>
-              </View>
-            ))
-          )}
-        </Card>
-      )}
+      {section === 'apps' && <GoogleCard />}
 
       {section === 'devices' && (
         <Card>
-          <SectionTitle title="Devices" subtitle="Wearable companion" />
-          <View style={{ paddingVertical: spacing.xl, alignItems: 'center' }}>
-            <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: spacing.sm }}>No KIPP device yet?</Text>
-            <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: 'center' }}>Everything works on your phone. Pairing arrives when hardware ships.</Text>
-            {device && device.connected && (
-              <View style={{ marginTop: spacing.lg, width: '100%' }}>
-                <Text style={{ color: colors.text, fontSize: 14 }}>Connected: {device.name} · {device.battery ?? '?'}%</Text>
-              </View>
-            )}
-          </View>
+          <CardHeader title="Devices" description="Wearable companion" />
+          {device && device.connected ? (
+            <>
+              <Separator />
+              <ListItem icon="device" title={device.name} description={`Battery ${device.battery ?? '?'}%`} trailing={<Badge label="Connected" variant="success" dot />} />
+            </>
+          ) : (
+            <Empty icon="device" title="No KIPP device yet?" description="Everything works on your phone. Pairing arrives when hardware ships." />
+          )}
         </Card>
       )}
 
       {section === 'settings' && (
-        <Card>
-          <SectionTitle title="Settings" subtitle="Voice, privacy, data" />
-          <SettingRow label="Voice answers" value={voiceEnabled} onToggle={setVoiceEnabled} />
-          <SettingRow label="Response style" value={user?.responseStyle || 'balanced'} />
-          <SettingRow label="Personality" value={user?.personality || 'balanced'} />
-          <SettingRow label="Timezone" value={user?.timezone || 'UTC'} />
-          <View style={{ marginTop: spacing.lg }}>
-            <TouchableOpacity style={{ backgroundColor: colors.surface2, borderRadius: 12, paddingVertical: spacing.md, alignItems: 'center', marginBottom: spacing.sm }}>
-              <Text style={{ color: colors.text, fontWeight: '600' }}>Export my data</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={{ backgroundColor: colors.danger + '22', borderRadius: 12, paddingVertical: spacing.md, alignItems: 'center' }}>
-              <Text style={{ color: colors.danger, fontWeight: '600' }}>Delete account</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={{ marginTop: spacing.md, alignItems: 'center' }}>
-              <Text style={{ color: colors.textMuted, fontSize: 13 }}>Sign out</Text>
-            </TouchableOpacity>
-          </View>
-        </Card>
+        <>
+          <AiSettings />
+
+          <Card>
+            <CardHeader title="Preferences" description="Voice and personality" />
+            <Separator />
+            <ListItem icon="voice" title="Voice answers" description="KIPP reads replies aloud" trailing={<Switch value={voiceEnabled} accessibilityLabel="Voice answers" onValueChange={setVoiceEnabled} />} />
+            <SettingRow icon="talk" label="Response style" value={user?.responseStyle || 'balanced'} onPress={() => cycle('responseStyle', ['concise', 'balanced', 'detailed'])} />
+            <SettingRow icon="sparkles" label="Personality" value={user?.personality || 'balanced'} onPress={() => cycle('personality', ['calm', 'balanced', 'playful'])} />
+            <SettingRow icon="globe" label="Timezone" value={user?.timezone || 'UTC'} />
+          </Card>
+
+          <Card>
+            <CardHeader title="Privacy & data" description="Everything is stored on this device" />
+            <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.sm }}>
+              <Button label="Export my data" icon="share" variant="outline" block onPress={exportData} />
+              <Button label="Delete all data" icon="trash" variant="destructive-outline" block onPress={confirmDeleteAll} />
+            </View>
+          </Card>
+        </>
       )}
-    </ScrollView>
+    </Screen>
   );
 }
 
-function SettingRow({ label, value, onToggle }: { label: string; value: any; onToggle?: (v: boolean) => void }) {
+function SettingRow({ icon, label, value, onPress }: { icon: IconName; label: string; value: string; onPress?: () => void }) {
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderSoft }}>
-      <Text style={{ color: colors.text, fontSize: 15 }}>{label}</Text>
-      {typeof value === 'boolean' && onToggle ? (
-        <Switch value={value} onValueChange={onToggle} trackColor={{ false: colors.surface2, true: colors.accent }} thumbColor={colors.text} />
+    <>
+      <Separator inset={spacing.lg + 32 + spacing.md} />
+      <ListItem icon={icon} title={label} onPress={onPress} trailing={<Text variant="bodySm" tone="muted" style={{ textTransform: 'capitalize' }}>{value}</Text>} />
+    </>
+  );
+}
+
+function AiSettings() {
+  const llm = useAppStore((s) => s.llm);
+  const setLlm = useAppStore((s) => s.setLlm);
+  const [key, setKey] = useState('');
+  const [hasKey, setHasKey] = useState(false);
+  const [model, setModel] = useState(llm.model);
+  const [status, setStatus] = useState<{ tone: 'success' | 'destructive' | 'muted'; text: string } | null>(null);
+
+  useEffect(() => { getApiKey().then((k) => setHasKey(!!k)); }, []);
+
+  const save = async () => {
+    if (key.trim()) await setApiKey(key);
+    setLlm({ model: model.trim() || DEFAULT_LLM.model });
+    setKey('');
+    const k = await getApiKey();
+    setHasKey(!!k);
+    setStatus({ tone: 'muted', text: 'Testing connection…' });
+    try {
+      await testConnection();
+      setStatus({ tone: 'success', text: `Connected to ${model.trim() || DEFAULT_LLM.model}.` });
+    } catch (e) {
+      setStatus({ tone: 'destructive', text: e instanceof KippError ? e.message : 'Connection failed.' });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader title="AI model" description="OpenCode Go (OpenAI-compatible)" action={<Badge label={hasKey ? 'Key saved' : 'No key'} variant={hasKey ? 'success' : 'warning'} dot />} />
+      <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md }}>
+        <Field label="API key" description="Stored in the device keychain.">
+          <Input value={key} onChangeText={setKey} placeholder={hasKey ? '•••••••• (saved — paste to replace)' : 'Paste your OpenCode Go key'} secureTextEntry autoCapitalize="none" autoCorrect={false} />
+        </Field>
+        <Field label="Model" description={`Default: ${DEFAULT_LLM.model}`}>
+          <Input value={model} onChangeText={setModel} placeholder={DEFAULT_LLM.model} autoCapitalize="none" autoCorrect={false} />
+        </Field>
+        <Button label="Save & test" icon="check" onPress={save} block />
+        {status ? <Text variant="caption" tone={status.tone}>{status.text}</Text> : null}
+      </View>
+    </Card>
+  );
+}
+
+const styles = StyleSheet.create({
+  profile: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.card,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: colors.input,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { fontFamily: fonts.semibold, fontSize: 22, color: colors.foreground },
+  memory: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+});
+
+function GoogleCard() {
+  const accounts = useAppStore((s) => s.accounts);
+  const setAccounts = useAppStore((s) => s.setAccounts);
+  const setEvents = useAppStore((s) => s.setEvents);
+  const tasks = useAppStore((s) => s.tasks);
+  const setTasks = useAppStore((s) => s.setTasks);
+  const google = accounts.find((a) => a.provider === 'google');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: 'destructive' | 'success' | 'muted'; text: string } | null>(null);
+  const unavailable = googleUnavailableReason();
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setMessage(null);
+    try { await fn(); } catch (e) { setMessage({ tone: 'destructive', text: e instanceof Error ? e.message : 'Something went wrong.' }); }
+    setBusy(false);
+  };
+
+  const connect = () => run(async () => {
+    const account = await connectGoogle();
+    if (!account) return;
+    setAccounts([...useAppStore.getState().accounts.filter((a) => a.provider !== 'google'), account]);
+    await syncGoogle();
+    setMessage({ tone: 'success', text: 'Connected. Calendar and Tasks are synced.' });
+  });
+
+  const sync = () => run(async () => {
+    await syncGoogle();
+    setMessage({ tone: 'success', text: 'Synced.' });
+  });
+
+  const disconnect = () => run(async () => {
+    await disconnectGoogle();
+    setAccounts(accounts.filter((a) => a.provider !== 'google'));
+    setEvents([]);
+    // Keep Google tasks locally but detach them from the remote list.
+    setTasks(tasks.map((t) => (t.externalId ? { ...t, externalId: undefined, source: 'kipp' } : t)));
+  });
+
+  return (
+    <Card>
+      <CardHeader
+        title="Google"
+        description="Calendar & Tasks"
+        action={google ? <Badge label={google.status === 'connected' ? 'Connected' : 'Reconnect needed'} variant={google.status === 'connected' ? 'success' : 'warning'} dot /> : undefined}
+      />
+      {google ? (
+        <>
+          <Separator />
+          <ListItem icon="person" title={google.name || 'Google account'} description={google.email} />
+          <Separator inset={spacing.lg} />
+          <ListItem icon="calendar" title="Calendar" description="Primary calendar · events show in Plans → Agenda" />
+          <Separator inset={spacing.lg} />
+          <ListItem icon="task" title="Tasks" description="Default list · two-way sync" />
+          <Separator inset={spacing.lg} />
+          <ListItem icon="clock" title="Last sync" description={google.lastSyncAt ? new Date(google.lastSyncAt).toLocaleString() : 'Never'} />
+          <View style={{ padding: spacing.lg, gap: spacing.sm }}>
+            {google.status === 'connected'
+              ? <Button label={busy ? 'Syncing…' : 'Sync now'} icon="restore" variant="outline" block disabled={busy} onPress={sync} />
+              : <Button label="Reconnect" icon="globe" block disabled={busy} onPress={connect} />}
+            <Button label="Disconnect" variant="destructive-outline" block disabled={busy} onPress={disconnect} />
+            {message ? <Text variant="caption" tone={message.tone}>{message.text}</Text> : null}
+          </View>
+        </>
       ) : (
-        <Text style={{ color: colors.textMuted, fontSize: 14, textTransform: 'capitalize' }}>{String(value)}</Text>
+        <Empty icon="apps" title="Connect Google" description={unavailable ?? 'See your agenda, add events, and sync tasks. KIPP only writes after you approve.'}>
+          <Button label={busy ? 'Connecting…' : 'Connect Google'} icon="globe" disabled={!!unavailable || busy} onPress={connect} />
+          {message ? <Text variant="caption" tone={message.tone} style={{ marginTop: spacing.md, textAlign: 'center' }}>{message.text}</Text> : null}
+        </Empty>
       )}
-    </View>
+    </Card>
   );
 }

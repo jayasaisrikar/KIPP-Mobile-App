@@ -1,5 +1,14 @@
 import { create } from 'zustand';
-import type { UserProfile, Message, Memory, Task, Reminder, ConnectedAccount, Device } from '../types';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import Storage from '../lib/storage';
+import type { UserProfile, Message, Memory, Task, Reminder, ConnectedAccount, Device, CalendarEvent } from '../types';
+
+export type LlmSettings = { baseUrl: string; model: string };
+
+export const DEFAULT_LLM: LlmSettings = {
+  baseUrl: 'https://opencode.ai/inference/go/openai/v1',
+  model: 'muse-spark-1.3-contributor',
+};
 
 type AppState = {
   user: UserProfile | null;
@@ -13,10 +22,15 @@ type AppState = {
   addMessage: (m: Message) => void;
   memories: Memory[];
   setMemories: (m: Memory[]) => void;
+  addMemory: (m: Memory) => void;
   tasks: Task[];
   setTasks: (t: Task[]) => void;
+  addTask: (t: Task) => void;
   reminders: Reminder[];
   setReminders: (r: Reminder[]) => void;
+  addReminder: (r: Reminder) => void;
+  events: CalendarEvent[];
+  setEvents: (e: CalendarEvent[]) => void;
   accounts: ConnectedAccount[];
   setAccounts: (a: ConnectedAccount[]) => void;
   device: Device | null;
@@ -29,34 +43,62 @@ type AppState = {
   setVoiceEnabled: (v: boolean) => void;
   reducedMotion: boolean;
   setReducedMotion: (v: boolean) => void;
+  llm: LlmSettings;
+  setLlm: (l: Partial<LlmSettings>) => void;
+  reset: () => void;
 };
 
-export const useAppStore = create<AppState>((set) => ({
+const initialData = {
   user: null,
-  setUser: (user) => set({ user }),
   onboardingDone: false,
-  setOnboardingDone: (onboardingDone) => set({ onboardingDone }),
   conversationId: null,
-  setConversationId: (conversationId) => set({ conversationId }),
   messages: [],
-  setMessages: (messages) => set({ messages }),
-  addMessage: (m) => set((s) => ({ messages: [...s.messages, m] })),
   memories: [],
-  setMemories: (memories) => set({ memories }),
   tasks: [],
-  setTasks: (tasks) => set({ tasks }),
   reminders: [],
-  setReminders: (reminders) => set({ reminders }),
   accounts: [],
-  setAccounts: (accounts) => set({ accounts }),
+  events: [],
   device: null,
-  setDevice: (device) => set({ device }),
   recording: false,
-  setRecording: (recording) => set({ recording }),
-  phase: 'idle',
-  setPhase: (phase) => set({ phase }),
+  phase: 'idle' as const,
   voiceEnabled: true,
-  setVoiceEnabled: (voiceEnabled) => set({ voiceEnabled }),
   reducedMotion: false,
-  setReducedMotion: (reducedMotion) => set({ reducedMotion }),
-}));
+  llm: DEFAULT_LLM,
+};
+
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
+      ...initialData,
+      setUser: (user) => set({ user }),
+      setOnboardingDone: (onboardingDone) => set({ onboardingDone }),
+      setConversationId: (conversationId) => set({ conversationId }),
+      setMessages: (messages) => set({ messages }),
+      addMessage: (m) => set((s) => ({ messages: [...s.messages, m] })),
+      setMemories: (memories) => set({ memories }),
+      addMemory: (m) => set((s) => ({ memories: [m, ...s.memories] })),
+      setTasks: (tasks) => set({ tasks }),
+      addTask: (t) => set((s) => ({ tasks: [t, ...s.tasks] })),
+      setReminders: (reminders) => set({ reminders }),
+      addReminder: (r) => set((s) => ({ reminders: [...s.reminders, r].sort((a, b) => a.triggerAt.localeCompare(b.triggerAt)) })),
+      setAccounts: (accounts) => set({ accounts }),
+      setEvents: (events) => set({ events }),
+      setDevice: (device) => set({ device }),
+      setRecording: (recording) => set({ recording }),
+      setPhase: (phase) => set({ phase }),
+      setVoiceEnabled: (voiceEnabled) => set({ voiceEnabled }),
+      setReducedMotion: (reducedMotion) => set({ reducedMotion }),
+      setLlm: (l) => set((s) => ({ llm: { ...s.llm, ...l } })),
+      reset: () => set(initialData),
+    }),
+    {
+      name: 'kipp-app',
+      storage: createJSONStorage(() => Storage),
+      // Transient UI state is not persisted.
+      partialize: ({ phase, recording, ...rest }) => rest,
+      version: 1,
+      // v1: beam-free stopped working; move users still on it to Muse Spark.
+      migrate: (state: any) => (state?.llm?.model === 'beam-free' ? { ...state, llm: { ...state.llm, model: DEFAULT_LLM.model } } : state),
+    },
+  ),
+);

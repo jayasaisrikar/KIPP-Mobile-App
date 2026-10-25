@@ -1,4 +1,4 @@
-import { colors, radii, spacing, typography } from '../constants/tokens';
+import { colors } from '../constants/tokens';
 
 export const kippFace = {
   idle: { left: 0.45, right: 0.55 },
@@ -10,9 +10,9 @@ export const kippFace = {
 export function emotionColor(e: string) {
   switch (e) {
     case 'happy': return colors.success;
-    case 'curious': return colors.accent;
+    case 'curious': return colors.brand;
     case 'skeptical': return colors.warning;
-    case 'concerned': return colors.danger;
-    default: return colors.textMuted;
+    case 'concerned': return colors.destructive;
+    default: return colors.mutedForeground;
   }
 }
