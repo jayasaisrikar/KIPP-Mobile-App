@@ -1,9 +1,12 @@
 import { useEffect, useSyncExternalStore } from 'react';
+import { Appearance } from 'react-native';
+import { reloadAppAsync } from 'expo';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { colors } from '../src/constants/tokens';
+import { colors, resolveScheme, scheme, themePreference } from '../src/constants/tokens';
+import { Toaster } from '../src/components/ui';
 import { useAppStore } from '../src/stores/appStore';
 import { syncGoogle } from '../src/lib/sync';
 import { notifications } from '../src/lib/notifications';
@@ -32,15 +35,24 @@ export default function RootLayout() {
     syncGoogle().catch(() => {});
   }, [ready]);
 
+  // Styles are built from the palette at startup, so follow system appearance changes by reloading.
+  useEffect(() => {
+    const sub = Appearance.addChangeListener(() => {
+      if (themePreference === 'system' && resolveScheme('system') !== scheme) reloadAppAsync().catch(() => {});
+    });
+    return () => sub.remove();
+  }, []);
+
   if (!ready) return null;
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" options={{ gestureEnabled: false, animation: 'fade' }} />
       </Stack>
+      <Toaster />
     </>
   );
 }

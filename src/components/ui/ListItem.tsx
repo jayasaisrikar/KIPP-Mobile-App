@@ -1,8 +1,9 @@
 import React from 'react';
-import { Pressable, StyleSheet, Switch as RNSwitch, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, Switch as RNSwitch, View, type StyleProp, type ViewStyle } from 'react-native';
 import { colors, radii, spacing } from '../../constants/tokens';
 import { Icon, type IconName } from './Icon';
 import { Text } from './Text';
+import { PressableScale } from './Motion';
 
 type Props = {
   title: string;
@@ -34,9 +35,9 @@ export function ListItem({ title, description, icon, iconColor = colors.mutedFor
   );
   if (!onPress) return <View style={[styles.row, style]}>{body}</View>;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.accent }, style]}>
+    <PressableScale scaleTo={0.985} onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.accent }, style]}>
       {body}
-    </Pressable>
+    </PressableScale>
   );
 }
 

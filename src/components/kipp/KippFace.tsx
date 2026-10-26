@@ -34,7 +34,7 @@ export function KippFace({ size = 96, emotion = 'neutral', phase = 'idle' }: Pro
 
   const happy = phase === 'speaking' || emotion === 'happy';
   const glance = phase === 'thinking' ? size * 0.05 : 0;
-  const eyeColor = phase === 'listening' ? colors.brand : '#2B2B2B';
+  const eyeColor = phase === 'listening' ? colors.brand : colors.faceInk;
   const ringColor = phase === 'listening' ? colors.brandTint : phase === 'thinking' ? colors.warningTint : phase === 'action' ? colors.infoTint : 'transparent';
 
   const ring = Math.max(3, size * 0.06);
@@ -63,10 +63,10 @@ export function KippFace({ size = 96, emotion = 'neutral', phase = 'idle' }: Pro
           <View style={[styles.blush, { width: size * 0.14, height: size * 0.07, borderRadius: size }]} />
           {/* Tiny smile: bottom half of a ring; an "o" while listening. */}
           {phase === 'listening' ? (
-            <View style={{ width: size * 0.08, height: size * 0.08, borderRadius: size, backgroundColor: '#2B2B2B' }} />
+            <View style={{ width: size * 0.08, height: size * 0.08, borderRadius: size, backgroundColor: colors.faceInk }} />
           ) : (
             <View style={{ width: size * 0.14, height: size * 0.07, overflow: 'hidden' }}>
-              <View style={{ marginTop: -size * 0.07, width: size * 0.14, height: size * 0.14, borderRadius: size, borderWidth: Math.max(1.5, size * 0.025), borderColor: '#2B2B2B' }} />
+              <View style={{ marginTop: -size * 0.07, width: size * 0.14, height: size * 0.14, borderRadius: size, borderWidth: Math.max(1.5, size * 0.025), borderColor: colors.faceInk }} />
             </View>
           )}
           <View style={[styles.blush, { width: size * 0.14, height: size * 0.07, borderRadius: size }]} />
@@ -77,6 +77,6 @@ export function KippFace({ size = 96, emotion = 'neutral', phase = 'idle' }: Pro
 }
 
 const styles = StyleSheet.create({
-  head: { backgroundColor: '#F4F1EA', alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth * 2, borderColor: 'rgba(255,255,255,0.6)' },
-  blush: { backgroundColor: 'rgba(244,143,143,0.45)' },
+  head: { backgroundColor: colors.faceHead, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth * 2, borderColor: colors.faceEdge },
+  blush: { backgroundColor: colors.blush },
 });

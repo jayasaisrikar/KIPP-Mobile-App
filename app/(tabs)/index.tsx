@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { colors, spacing } from '../../src/constants/tokens';
 import { KippFace } from '../../src/components/kipp/KippFace';
-import { Badge, Button, Card, CardHeader, Empty, ListItem, Screen, Separator, Text } from '../../src/components/ui';
+import { Badge, Button, Card, CardHeader, Empty, ListItem, PressableScale, Screen, Separator, Text, haptic, useCountUp } from '../../src/components/ui';
 import { useAppStore } from '../../src/stores/appStore';
 
 const greeting = () => {
@@ -47,7 +47,7 @@ export default function HomeScreen() {
             {quiet ? 'Nothing urgent. Remarkable.' : 'A few things worth remembering.'}
           </Text>
         </View>
-        <KippFace size={60} phase={phase} />
+        <TappableFace phase={phase} />
       </View>
 
       <View style={styles.stats}>
@@ -92,11 +92,33 @@ export default function HomeScreen() {
   );
 }
 
+// KIPP grins and bounces when poked.
+function TappableFace({ phase }: { phase: string }) {
+  const [happy, setHappy] = useState(false);
+  useEffect(() => {
+    if (!happy) return;
+    const t = setTimeout(() => setHappy(false), 1400);
+    return () => clearTimeout(t);
+  }, [happy]);
+  return (
+    <PressableScale
+      scaleTo={0.86}
+      hapticOnPress={false}
+      onPress={() => { haptic.press(); setHappy(true); }}
+      accessibilityRole="button"
+      accessibilityLabel="Say hi to KIPP"
+    >
+      <KippFace size={76} phase={happy ? 'speaking' : phase} emotion={happy ? 'happy' : undefined} />
+    </PressableScale>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: number }) {
+  const shown = useCountUp(value);
   return (
     <Card style={styles.stat}>
       <Text variant="caption" tone="muted">{label}</Text>
-      <Text variant="h1" style={{ marginTop: 2 }}>{value}</Text>
+      <Text variant="h1" style={{ marginTop: 2, fontVariant: ['tabular-nums'] }}>{shown}</Text>
     </Card>
   );
 }

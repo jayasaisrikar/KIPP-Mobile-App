@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { View, ScrollView, TextInput, Pressable, KeyboardAvoidingView, Platform, StyleSheet, type ScrollViewInstance } from 'react-native';
+import { View, ScrollView, TextInput, KeyboardAvoidingView, Platform, StyleSheet, type ScrollViewInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Speech from 'expo-speech';
 import { router } from 'expo-router';
 import { colors, fonts, radii, shadows, spacing } from '../../src/constants/tokens';
 import { KippFace } from '../../src/components/kipp/KippFace';
-import { Badge, Button, Card, Icon, Text, type BadgeVariant } from '../../src/components/ui';
+import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { Badge, Button, Card, Icon, PressableScale, Skeleton, Text, haptic, type BadgeVariant } from '../../src/components/ui';
 import { useAppStore } from '../../src/stores/appStore';
 import { askKipp, KippError } from '../../src/lib/kipp';
 import { commitAction, describeAction } from '../../src/lib/actions';
@@ -69,6 +70,7 @@ export default function TalkScreen() {
     try {
       const result = await commitAction(action);
       updateAction(messageId, action.id, { state: 'committed', result });
+      haptic.success();
     } catch (e) {
       updateAction(messageId, action.id, { state: 'failed', result: e instanceof Error ? e.message : 'Could not save this.' });
     }
@@ -116,11 +118,13 @@ export default function TalkScreen() {
               <Text variant="h2" style={{ marginTop: spacing.lg }}>Ask me anything.</Text>
               <Text variant="bodySm" tone="muted" style={{ marginTop: spacing.xs, textAlign: 'center', maxWidth: 280 }}>Tasks, reminders, calendar, memory — I’ll propose, you approve.</Text>
               <View style={styles.suggestions}>
-                {suggestions.map((s) => (
-                  <Pressable key={s} onPress={() => send(s)} style={({ pressed }) => [styles.suggestion, pressed && { backgroundColor: colors.accent }]}>
-                    <Icon name="sparkles" size={14} color={colors.mutedForeground} />
-                    <Text variant="bodySm" style={{ flex: 1 }}>{s}</Text>
-                  </Pressable>
+                {suggestions.map((s, i) => (
+                  <Animated.View key={s} entering={FadeInDown.delay(150 + i * 70).springify().damping(18)}>
+                    <PressableScale onPress={() => send(s)} style={({ pressed }) => [styles.suggestion, pressed && { backgroundColor: colors.accent }]}>
+                      <Icon name="sparkles" size={14} color={colors.mutedForeground} />
+                      <Text variant="bodySm" style={{ flex: 1 }}>{s}</Text>
+                    </PressableScale>
+                  </Animated.View>
                 ))}
               </View>
             </View>
@@ -129,23 +133,29 @@ export default function TalkScreen() {
             const mine = m.role === 'user';
             return (
               <View key={m.id}>
-                <View style={[styles.bubbleRow, { justifyContent: mine ? 'flex-end' : 'flex-start' }]}>
+                <Animated.View
+                  entering={(mine ? FadeInUp : FadeInDown).duration(320).springify().damping(18)}
+                  style={[styles.bubbleRow, { justifyContent: mine ? 'flex-end' : 'flex-start' }]}
+                >
                   <View style={[styles.bubble, mine ? styles.bubbleUser : styles.bubbleKipp]}>
                     <Text variant="body" tone={mine ? 'inverse' : 'default'} style={{ fontSize: 15, lineHeight: 22 }}>{m.content}</Text>
                   </View>
-                </View>
-                {m.actions?.map((a) => (
-                  <ActionCard key={a.id} action={a} onApprove={() => approve(m.id, a)} onCancel={() => reject(m.id, a)} />
+                </Animated.View>
+                {m.actions?.map((a, i) => (
+                  <Animated.View key={a.id} entering={FadeInDown.delay(180 + i * 80).springify().damping(16)}>
+                    <ActionCard action={a} onApprove={() => approve(m.id, a)} onCancel={() => reject(m.id, a)} />
+                  </Animated.View>
                 ))}
               </View>
             );
           })}
           {busy && (
-            <View style={[styles.bubbleRow, { justifyContent: 'flex-start' }]}>
-              <View style={[styles.bubble, styles.bubbleKipp]}>
-                <Text variant="body" tone="muted" style={{ fontSize: 15 }}>…</Text>
+            <Animated.View entering={FadeIn.duration(200)} style={[styles.bubbleRow, { justifyContent: 'flex-start' }]}>
+              <View accessibilityLabel="KIPP is thinking" style={[styles.bubble, styles.bubbleKipp, { width: 200, gap: 8, paddingVertical: 14 }]}>
+                <Skeleton width="90%" height={10} />
+                <Skeleton width="60%" height={10} />
               </View>
-            </View>
+            </Animated.View>
           )}
           {voice.error && (
             <Card style={{ borderColor: colors.destructiveTint, marginTop: spacing.sm }}>

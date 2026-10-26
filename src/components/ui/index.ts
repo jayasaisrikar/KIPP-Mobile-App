@@ -9,3 +9,7 @@ export { ListItem, Switch } from './ListItem';
 export { Screen } from './Screen';
 export { SegmentedControl } from './SegmentedControl';
 export { Text, type TextVariant, type TextTone } from './Text';
+export { Sheet, Dialog } from './Overlay';
+export { Enter, PressableScale, haptic, useCountUp } from './Motion';
+export { Toaster, toast, type ToastVariant } from './Toast';
+export { Skeleton, SkeletonRow, Avatar, Progress } from './Feedback';

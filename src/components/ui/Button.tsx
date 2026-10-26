@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { PressableScale } from './Motion';
 import { colors, fonts, radii, shadows, spacing } from '../../constants/tokens';
 import { Icon, type IconName } from './Icon';
 import { Text } from './Text';
@@ -22,11 +23,11 @@ type Props = {
 };
 
 const variantStyle: Record<ButtonVariant, { bg: string; pressedBg: string; fg: string; border?: string; shadow?: boolean }> = {
-  default: { bg: colors.primary, pressedBg: '#D9D9D9', fg: colors.primaryForeground, shadow: true },
+  default: { bg: colors.primary, pressedBg: colors.primaryPressed, fg: colors.primaryForeground, shadow: true },
   secondary: { bg: colors.secondary, pressedBg: colors.accent, fg: colors.foreground },
-  outline: { bg: colors.popover, pressedBg: '#222222', fg: colors.foreground, border: colors.input, shadow: true },
+  outline: { bg: colors.popover, pressedBg: colors.surfacePressed, fg: colors.foreground, border: colors.input, shadow: true },
   ghost: { bg: 'transparent', pressedBg: colors.accent, fg: colors.foreground },
-  destructive: { bg: colors.destructive, pressedBg: '#D94B4B', fg: colors.white, shadow: true },
+  destructive: { bg: colors.destructive, pressedBg: colors.destructivePressed, fg: colors.white, shadow: true },
   'destructive-outline': { bg: colors.popover, pressedBg: colors.destructiveTint, fg: colors.destructiveForeground, border: colors.input, shadow: true },
 };
 
@@ -42,7 +43,8 @@ export function Button({ label, onPress, variant = 'default', size = 'default', 
   const v = variantStyle[variant];
   const s = sizeStyle[size];
   return (
-    <Pressable
+    <PressableScale
+      scaleTo={size === 'icon' || size === 'icon-sm' ? 0.9 : 0.97}
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
@@ -62,7 +64,7 @@ export function Button({ label, onPress, variant = 'default', size = 'default', 
       {icon ? <Icon name={icon} size={s.iconSize} color={v.fg} /> : null}
       {label ? <Text style={{ fontFamily: fonts.medium, fontSize: s.fontSize, lineHeight: s.fontSize + 6, color: v.fg }}>{label}</Text> : null}
       {iconRight ? <View style={{ opacity: 0.72 }}><Icon name={iconRight} size={s.iconSize - 2} color={v.fg} /></View> : null}
-    </Pressable>
+    </PressableScale>
   );
 }
 

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, Platform, Share } from 'react-native';
+import { View, StyleSheet, Share } from 'react-native';
+import { reloadAppAsync } from 'expo';
 import { router, useLocalSearchParams } from 'expo-router';
 import { notifications } from '../../src/lib/notifications';
 import * as Speech from 'expo-speech';
-import { colors, fonts, spacing } from '../../src/constants/tokens';
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, ListItem, Screen, SegmentedControl, Separator, Switch, Text, type IconName } from '../../src/components/ui';
+import { saveThemePreference, spacing, themePreference, type ThemePreference } from '../../src/constants/tokens';
+import { Avatar, Badge, Button, Card, CardHeader, Dialog, Empty, Field, Input, ListItem, Screen, SegmentedControl, Separator, Switch, Text, toast, type IconName } from '../../src/components/ui';
 import { getApiKey, setApiKey } from '../../src/lib/secrets';
 import { testConnection, KippError } from '../../src/lib/kipp';
 import type { UserProfile } from '../../src/types';
@@ -38,6 +39,7 @@ export default function YouScreen() {
     if (sectionFromParam) setSection(sectionFromParam);
   }
   const name = user?.displayName || 'KIPP user';
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const cycle = <K extends 'responseStyle' | 'personality'>(key: K, options: UserProfile[K][]) => {
     if (!user) return;
@@ -48,7 +50,11 @@ export default function YouScreen() {
   const exportData = async () => {
     const { user: u, tasks, reminders, memories: mems, messages } = useAppStore.getState();
     const json = JSON.stringify({ exportedAt: new Date().toISOString(), user: u, tasks, reminders, memories: mems, messages }, null, 2);
-    await Share.share({ title: 'KIPP data export', message: json });
+    try {
+      await Share.share({ title: 'KIPP data export', message: json });
+    } catch {
+      toast('Could not open the share sheet', { variant: 'error' });
+    }
   };
 
   const deleteAll = async () => {
@@ -57,26 +63,36 @@ export default function YouScreen() {
     await setApiKey(null);
     await disconnectGoogle();
     useAppStore.getState().reset();
+    setConfirmingDelete(false);
     router.replace('/onboarding');
-  };
-  const confirmDeleteAll = () => {
-    if (Platform.OS === 'web') { deleteAll(); return; }
-    Alert.alert('Delete all data?', 'This removes your profile, tasks, reminders, memories, chat history and API key from this device.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: deleteAll },
-    ]);
+    toast('All data deleted', { variant: 'success' });
   };
 
+  const setMemoryDeleted = (id: string, deleted: boolean) => {
+    const current = useAppStore.getState().memories;
+    setMemories(current.map((m) => m.id === id ? { ...m, deletedAt: deleted ? new Date().toISOString() : undefined } : m));
+  };
   const toggleMemory = (id: string) => {
-    setMemories(memories.map((m) => m.id === id ? { ...m, deletedAt: m.deletedAt ? undefined : new Date().toISOString() } : m));
+    const forgetting = !memories.find((m) => m.id === id)?.deletedAt;
+    setMemoryDeleted(id, forgetting);
+    if (forgetting) toast('Memory forgotten', { action: { label: 'Undo', onPress: () => setMemoryDeleted(id, false) } });
+  };
+
+  const themes: { value: ThemePreference; label: string }[] = [
+    { value: 'system', label: 'System' },
+    { value: 'light', label: 'Light' },
+    { value: 'dark', label: 'Dark' },
+  ];
+  const cycleTheme = () => {
+    const next = themes[(themes.findIndex((t) => t.value === themePreference) + 1) % themes.length].value;
+    saveThemePreference(next);
+    reloadAppAsync().catch(() => toast('Restart KIPP to apply the theme', { variant: 'info' }));
   };
 
   return (
     <Screen>
       <View style={styles.profile}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{name.trim().charAt(0).toUpperCase()}</Text>
-        </View>
+        <Avatar name={name} size={56} />
         <View style={{ flex: 1 }}>
           <Text variant="h1">{name}</Text>
           <Text variant="bodySm" tone="muted" style={{ marginTop: 2 }}>{user?.timezone || 'UTC'}</Text>
@@ -150,14 +166,35 @@ export default function YouScreen() {
           </Card>
 
           <Card>
+            <CardHeader title="Appearance" description="Changing the theme reloads KIPP" />
+            <Separator />
+            <ListItem
+              icon={themePreference === 'light' ? 'sun' : themePreference === 'dark' ? 'moon' : 'contrast'}
+              title="Theme"
+              onPress={cycleTheme}
+              trailing={<Text variant="bodySm" tone="muted">{themes.find((t) => t.value === themePreference)?.label}</Text>}
+            />
+          </Card>
+
+          <Card>
             <CardHeader title="Privacy & data" description="Everything is stored on this device" />
             <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.sm }}>
               <Button label="Export my data" icon="share" variant="outline" block onPress={exportData} />
-              <Button label="Delete all data" icon="trash" variant="destructive-outline" block onPress={confirmDeleteAll} />
+              <Button label="Delete all data" icon="trash" variant="destructive-outline" block onPress={() => setConfirmingDelete(true)} />
             </View>
           </Card>
         </>
       )}
+
+      <Dialog
+        open={confirmingDelete}
+        onClose={() => setConfirmingDelete(false)}
+        title="Delete all data?"
+        description="This removes your profile, tasks, reminders, memories, chat history and API key from this device, and disconnects Google. It can't be undone."
+        confirmLabel="Delete everything"
+        destructive
+        onConfirm={deleteAll}
+      />
     </Screen>
   );
 }
@@ -191,6 +228,7 @@ function AiSettings() {
     try {
       await testConnection();
       setStatus({ tone: 'success', text: `Connected to ${model.trim() || DEFAULT_LLM.model}.` });
+      toast('KIPP is connected', { variant: 'success' });
     } catch (e) {
       setStatus({ tone: 'destructive', text: e instanceof KippError ? e.message : 'Connection failed.' });
     }
@@ -215,17 +253,6 @@ function AiSettings() {
 
 const styles = StyleSheet.create({
   profile: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.card,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: colors.input,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { fontFamily: fonts.semibold, fontSize: 22, color: colors.foreground },
   memory: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
 });
 
@@ -252,12 +279,12 @@ function GoogleCard() {
     if (!account) return;
     setAccounts([...useAppStore.getState().accounts.filter((a) => a.provider !== 'google'), account]);
     await syncGoogle();
-    setMessage({ tone: 'success', text: 'Connected. Calendar and Tasks are synced.' });
+    toast('Google connected', { description: 'Calendar and Tasks are synced.', variant: 'success' });
   });
 
   const sync = () => run(async () => {
     await syncGoogle();
-    setMessage({ tone: 'success', text: 'Synced.' });
+    toast('Synced with Google', { variant: 'success' });
   });
 
   const disconnect = () => run(async () => {
@@ -266,6 +293,7 @@ function GoogleCard() {
     setEvents([]);
     // Keep Google tasks locally but detach them from the remote list.
     setTasks(tasks.map((t) => (t.externalId ? { ...t, externalId: undefined, source: 'kipp' } : t)));
+    toast('Google disconnected');
   });
 
   return (

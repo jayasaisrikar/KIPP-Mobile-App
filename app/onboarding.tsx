@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '../src/constants/tokens';
 import { KippFace } from '../src/components/kipp/KippFace';
-import { Button, Card, Field, Input, ListItem, Separator, Text, type IconName } from '../src/components/ui';
+import { Button, Card, Field, Input, ListItem, Progress, Separator, Text, type IconName } from '../src/components/ui';
 import { useAppStore } from '../src/stores/appStore';
 import { ensureNotificationPermission } from '../src/lib/actions';
 import { setApiKey } from '../src/lib/secrets';
@@ -51,9 +51,7 @@ export default function OnboardingScreen() {
             <Button variant="ghost" size="icon-sm" icon="chevronLeft" accessibilityLabel="Back" onPress={() => setStep(step - 1)} />
           ) : <View style={{ width: 36 }} />}
           <View style={styles.progress}>
-            {Array.from({ length: STEPS }, (_, i) => (
-              <View key={i} style={[styles.progressDot, { backgroundColor: i <= step ? colors.foreground : colors.input }]} />
-            ))}
+            <Progress value={(step + 1) / STEPS} />
           </View>
           <View style={{ width: 36 }} />
         </View>
@@ -137,8 +135,7 @@ export default function OnboardingScreen() {
 
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, height: 48 },
-  progress: { flexDirection: 'row', gap: 6 },
-  progressDot: { width: 20, height: 4, borderRadius: 2 },
+  progress: { width: 120 },
   content: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxxl },
   hero: { alignItems: 'center', paddingTop: spacing.xl, marginBottom: spacing.xxxl },
   section: { gap: spacing.lg },
