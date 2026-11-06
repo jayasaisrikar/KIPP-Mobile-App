@@ -1,7 +1,6 @@
 import { Redirect, Tabs } from 'expo-router';
-import { StyleSheet, type ColorValue } from 'react-native';
-import { colors, fonts } from '../../src/constants/tokens';
-import { Icon, type IconName } from '../../src/components/ui';
+import { colors } from '../../src/constants/tokens';
+import { TabBar } from '../../src/components/kipp/TabBar';
 import { useAppStore } from '../../src/stores/appStore';
 
 export default function TabLayout() {
@@ -10,29 +9,13 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.foreground,
-        tabBarInactiveTintColor: colors.mutedForeground,
-        tabBarStyle: {
-          backgroundColor: colors.background,
-          borderTopColor: colors.border,
-          borderTopWidth: StyleSheet.hairlineWidth * 2,
-        },
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
-        sceneStyle: { backgroundColor: colors.background },
-      }}
+      tabBar={(props) => <TabBar {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.background } }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: tabIcon('home') }} />
-      <Tabs.Screen name="talk" options={{ title: 'Talk', tabBarIcon: tabIcon('talk') }} />
-      <Tabs.Screen name="plans" options={{ title: 'Plans', tabBarIcon: tabIcon('plans') }} />
-      <Tabs.Screen name="you" options={{ title: 'You', tabBarIcon: tabIcon('you') }} />
+      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="talk" options={{ title: 'Talk' }} />
+      <Tabs.Screen name="plans" options={{ title: 'Plans' }} />
+      <Tabs.Screen name="you" options={{ title: 'You' }} />
     </Tabs>
   );
-}
-
-function tabIcon(name: IconName) {
-  return function TabIcon({ color }: { color: ColorValue }) {
-    return <Icon name={name} size={22} color={color} />;
-  };
 }

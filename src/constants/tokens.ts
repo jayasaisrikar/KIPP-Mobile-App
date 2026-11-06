@@ -9,19 +9,20 @@ import Storage from '../lib/storage';
 
 // coss ui dark theme.
 const dark = {
-  background: '#161616', // neutral-950 95% + white
-  card: '#1B1B1B', // background 98% + white
-  popover: '#1B1B1B',
-  foreground: '#F5F5F5', // neutral-100
-  primary: '#F5F5F5',
-  primaryForeground: '#262626', // neutral-800
-  secondary: 'rgba(255,255,255,0.05)',
-  muted: 'rgba(255,255,255,0.04)',
-  mutedForeground: '#8A8A8A', // neutral-500 90% + white
-  accent: 'rgba(255,255,255,0.06)', // hover / pressed surface
-  border: 'rgba(255,255,255,0.08)',
-  input: 'rgba(255,255,255,0.10)',
-  ring: '#737373',
+  // Deep teal-night palette with glassy surfaces.
+  background: '#080F1B',
+  card: '#222933',
+  popover: '#29333E',
+  foreground: '#F2F7F7',
+  primary: '#00B89F',
+  primaryForeground: '#FFFFFF',
+  secondary: 'rgba(255,255,255,0.07)',
+  muted: 'rgba(255,255,255,0.05)',
+  mutedForeground: '#8C9C9F',
+  accent: 'rgba(255,255,255,0.09)', // hover / pressed surface
+  border: 'rgba(255,255,255,0.09)',
+  input: 'rgba(255,255,255,0.12)',
+  ring: '#00B89F',
   destructive: '#F15757',
   destructiveForeground: '#F87171',
   destructiveTint: 'rgba(239,68,68,0.10)',
@@ -35,11 +36,11 @@ const dark = {
   warningForeground: '#FBBF24',
   warningTint: 'rgba(245,158,11,0.10)',
   // KIPP's own identity colour, used sparingly (face, listening state).
-  brand: '#8FA9BC',
-  brandTint: 'rgba(143,169,188,0.14)',
+  brand: '#2FD4B4',
+  brandTint: 'rgba(47,212,180,0.16)',
   // Pressed states and KIPP's face, which need per-theme values.
-  primaryPressed: '#D9D9D9',
-  surfacePressed: '#222222',
+  primaryPressed: '#129C85',
+  surfacePressed: '#1D2C31',
   destructivePressed: '#D94B4B',
   overlay: 'rgba(0,0,0,0.6)',
   skeleton: 'rgba(255,255,255,0.07)',
@@ -59,8 +60,8 @@ const light: Palette = {
   card: '#FFFFFF',
   popover: '#FFFFFF',
   foreground: '#262626', // neutral-800
-  primary: '#262626',
-  primaryForeground: '#FAFAFA',
+  primary: '#0FA58B',
+  primaryForeground: '#FFFFFF',
   secondary: 'rgba(0,0,0,0.04)',
   muted: 'rgba(0,0,0,0.04)',
   mutedForeground: '#6B6B6B', // neutral-500 mixed toward foreground
@@ -80,9 +81,9 @@ const light: Palette = {
   warning: '#F59E0B',
   warningForeground: '#B45309',
   warningTint: 'rgba(245,158,11,0.10)',
-  brand: '#6E8EA6',
-  brandTint: 'rgba(110,142,166,0.16)',
-  primaryPressed: '#404040',
+  brand: '#0FA58B',
+  brandTint: 'rgba(15,165,139,0.14)',
+  primaryPressed: '#0C8A74',
   surfacePressed: '#F2F2F2',
   destructivePressed: '#DC2626',
   overlay: 'rgba(0,0,0,0.32)',
@@ -101,9 +102,9 @@ const THEME_KEY = 'kipp-theme';
 function readPreference(): ThemePreference {
   try {
     const v = Storage.getItemSync(THEME_KEY);
-    return v === 'light' || v === 'dark' ? v : 'system';
+    return v === 'light' || v === 'dark' || v === 'system' ? v : 'dark';
   } catch {
-    return 'system';
+    return 'dark';
   }
 }
 
@@ -114,6 +115,19 @@ export const scheme = resolveScheme(themePreference);
 export const saveThemePreference = (pref: ThemePreference) => Storage.setItemSync(THEME_KEY, pref);
 
 export const colors: Palette = scheme === 'light' ? light : dark;
+
+// Ambient screen wash and hero fills (CSS gradient strings, rendered natively via backgroundImage).
+export const gradients = scheme === 'light'
+  ? {
+      screen: 'linear-gradient(180deg, #DDF5EF 0%, #FFFFFF 45%)',
+      hero: 'linear-gradient(135deg, #2CC9AD 0%, #0E8F7A 100%)',
+      talk: 'radial-gradient(circle at 50% 18%, #9FE6D7 0%, #E8F7F3 45%, #FFFFFF 85%)',
+    }
+  : {
+      screen: 'radial-gradient(ellipse at 0% 0%, rgba(0,196,171,0.32) 0%, transparent 30%), radial-gradient(ellipse at 100% 100%, rgba(30,91,116,0.38) 0%, transparent 42%), linear-gradient(180deg, #080F1B 0%, #080F1B 100%)',
+      hero: 'linear-gradient(120deg, #08B89E 0%, #00C9AF 60%, #079F91 100%)',
+      talk: 'radial-gradient(ellipse at 18% 12%, #00C5AE 0%, rgba(0,163,149,0.75) 19%, transparent 51%), radial-gradient(ellipse at 100% 95%, #153B50 0%, transparent 42%), linear-gradient(180deg, #0B343C 0%, #080F1B 62%, #080F1B 100%)',
+    };
 
 // coss --radius: 0.625rem → 10
 export const radii = {
@@ -162,8 +176,10 @@ export const shadows = {
   lg: { shadowColor: colors.black, shadowOpacity: 0.4 * shadowScale, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
 } as const;
 
+// Motion: short, eased, never bouncy. One curve everywhere (iOS-style ease-out).
 export const motion = {
-  fast: 150,
+  fast: 120,
   base: 200,
-  slow: 250,
+  slow: 260,
+  easing: [0.25, 0.1, 0.25, 1] as const,
 } as const;

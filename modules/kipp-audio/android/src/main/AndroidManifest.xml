@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Microphone capture for the user-started audio device test. -->
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+  <!-- setMode / setCommunicationDevice / startBluetoothSco (normal permission, no prompt). -->
+  <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+  <!-- Android 11 and lower only: required by startBluetoothSco(). Install-time, no prompt.
+       Android 12+ routing goes through setCommunicationDevice(), which needs no Bluetooth permission. -->
+  <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+</manifest>

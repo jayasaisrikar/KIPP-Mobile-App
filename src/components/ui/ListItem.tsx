@@ -35,7 +35,7 @@ export function ListItem({ title, description, icon, iconColor = colors.mutedFor
   );
   if (!onPress) return <View style={[styles.row, style]}>{body}</View>;
   return (
-    <PressableScale scaleTo={0.985} onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.accent }, style]}>
+    <PressableScale onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.accent }, style]}>
       {body}
     </PressableScale>
   );

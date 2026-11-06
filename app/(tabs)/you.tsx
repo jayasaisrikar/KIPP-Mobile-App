@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Share } from 'react-native';
+import { View, StyleSheet, Share, Platform } from 'react-native';
 import { reloadAppAsync } from 'expo';
 import { router, useLocalSearchParams } from 'expo-router';
 import { notifications } from '../../src/lib/notifications';
 import * as Speech from 'expo-speech';
-import { saveThemePreference, spacing, themePreference, type ThemePreference } from '../../src/constants/tokens';
-import { Avatar, Badge, Button, Card, CardHeader, Dialog, Empty, Field, Input, ListItem, Screen, SegmentedControl, Separator, Switch, Text, toast, type IconName } from '../../src/components/ui';
+import { colors, saveThemePreference, spacing, themePreference, type ThemePreference } from '../../src/constants/tokens';
+import { Avatar, Badge, Button, Card, CardHeader, Dialog, Empty, Field, Icon, Input, ListItem, Screen, SegmentedControl, Separator, Switch, Text, toast, type IconName } from '../../src/components/ui';
 import { getApiKey, setApiKey } from '../../src/lib/secrets';
 import { testConnection, KippError } from '../../src/lib/kipp';
 import type { UserProfile } from '../../src/types';
@@ -149,6 +149,12 @@ export default function YouScreen() {
           ) : (
             <Empty icon="device" title="No KIPP device yet?" description="Everything works on your phone. Pairing arrives when hardware ships." />
           )}
+          {Platform.OS === 'android' ? (
+            <>
+              <Separator />
+              <ListItem icon="mic" title="Audio device test" description="Check earbud, headset and phone microphones" onPress={() => router.push('/audio-test')} trailing={<Icon name="chevronRight" color={colors.mutedForeground} />} />
+            </>
+          ) : null}
         </Card>
       )}
 

@@ -44,7 +44,7 @@ export function Button({ label, onPress, variant = 'default', size = 'default', 
   const s = sizeStyle[size];
   return (
     <PressableScale
-      scaleTo={size === 'icon' || size === 'icon-sm' ? 0.9 : 0.97}
+      scaleTo={size === 'icon' || size === 'icon-sm' ? 0.96 : 0.98}
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"

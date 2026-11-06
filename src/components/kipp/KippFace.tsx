@@ -21,15 +21,8 @@ export function KippFace({ size = 96, emotion = 'neutral', phase = 'idle' }: Pro
         Animated.timing(blink, { toValue: 1, duration: 110, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       ]),
     );
-    const bobbing = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bob, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(bob, { toValue: 0, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]),
-    );
     blinking.start();
-    bobbing.start();
-    return () => { blinking.stop(); bobbing.stop(); };
+    return () => blinking.stop();
   }, [reducedMotion, blink, bob]);
 
   const happy = phase === 'speaking' || emotion === 'happy';

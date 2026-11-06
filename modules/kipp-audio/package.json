@@ -1,0 +1,7 @@
+{
+  "name": "kipp-audio",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "description": "KIPP native Android audio-device discovery, routing and foreground capture test"
+}

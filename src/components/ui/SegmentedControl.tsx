@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { colors, fonts, radii, shadows } from '../../constants/tokens';
-import { haptic } from './Motion';
+import { ease, haptic } from './Motion';
 import { Text } from './Text';
 
 const PAD = 3;
@@ -16,7 +16,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
   const index = Math.max(0, options.findIndex((o) => o.value === value));
   const indicator = useAnimatedStyle(() => ({
     width: segment,
-    transform: [{ translateX: withSpring(index * segment, { damping: 20, stiffness: 220 }) }],
+    transform: [{ translateX: withTiming(index * segment, { duration: 220, easing: ease }) }],
   }));
 
   return (

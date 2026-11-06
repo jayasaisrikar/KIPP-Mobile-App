@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { colors, radii, spacing } from '../../src/constants/tokens';
-import Animated, { ZoomIn } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
+import { fadeIn } from '../../src/components/ui/Motion';
 import { Badge, Button, Card, CardHeader, Empty, Field, Icon, Input, ListItem, Progress, Screen, SegmentedControl, Separator, Sheet, SkeletonRow, Switch, Text, haptic, toast } from '../../src/components/ui';
 import { cancelReminder, createTask, scheduleReminder } from '../../src/lib/actions';
 import { googleAccount, pushTaskDelete, pushTaskStatus, syncGoogle } from '../../src/lib/sync';
@@ -253,7 +254,7 @@ function TaskRow({ task, onToggle, onDelete }: { task: Task; onToggle: () => voi
       leading={
         <Pressable onPress={onToggle} accessibilityRole="checkbox" accessibilityState={{ checked: done }} hitSlop={8}>
           <View style={[styles.checkbox, done && styles.checkboxOn]}>
-            {done && <Animated.View entering={ZoomIn.springify().damping(12)}><Icon name="check" size={13} color={colors.primaryForeground} /></Animated.View>}
+            {done && <Animated.View entering={fadeIn}><Icon name="check" size={13} color={colors.primaryForeground} /></Animated.View>}
           </View>
         </Pressable>
       }

@@ -40,6 +40,18 @@ const icons = {
   voice: { ios: 'waveform', android: 'graphic_eq' },
   person: { ios: 'person', android: 'person' },
   task: { ios: 'checkmark.circle', android: 'check_circle' },
+  arrowLeft: { ios: 'arrow.left', android: 'arrow_back' },
+  more: { ios: 'ellipsis', android: 'more_horiz' },
+  chat: { ios: 'text.bubble', android: 'chat' },
+  camera: { ios: 'camera', android: 'photo_camera' },
+  photo: { ios: 'photo', android: 'image' },
+  attach: { ios: 'paperclip', android: 'attach_file' },
+  chevronDown: { ios: 'chevron.down', android: 'expand_more' },
+  alarm: { ios: 'alarm', android: 'alarm' },
+  translate: { ios: 'character.bubble', android: 'translate' },
+  compose: { ios: 'square.and.pencil', android: 'edit_square' },
+  paperplane: { ios: 'paperplane.fill', android: 'send' },
+  scan: { ios: 'viewfinder', android: 'center_focus_strong' },
 } satisfies Record<string, { ios: SFSymbol; android: AndroidSymbol }>;
 
 export type IconName = keyof typeof icons;

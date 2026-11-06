@@ -58,6 +58,17 @@
           "speechRecognitionPermission": "KIPP turns your voice into text so you can talk instead of type."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "488f0194-f728-443c-a8bb-83869c645dbc"
+      }
+    },
+    "owner": "jayasaisrikar"
   }
 }

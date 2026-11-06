@@ -1,7 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Platform, Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { motion } from '../../constants/tokens';
 import * as Haptics from 'expo-haptics';
+
+export const ease = Easing.bezier(...motion.easing);
+/** Standard content entrance: a quiet fade, no movement, no overshoot. */
+export const fadeIn = FadeIn.duration(motion.base).easing(ease);
 
 // Shared motion primitives. Reanimated honours the system "reduce motion" setting by default.
 
@@ -11,10 +16,10 @@ export const haptic = {
   success: () => { if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); },
 };
 
-/** Fades and lifts its children in; `index` staggers siblings. */
-export function Enter({ index = 0, children, style }: { index?: number; children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+/** Fades its children in once on mount. `index` is accepted for compatibility but no longer staggers. */
+export function Enter({ children, style }: { index?: number; children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
-    <Animated.View entering={FadeInDown.duration(420).delay(Math.min(index, 8) * 55).springify().damping(18).stiffness(160)} style={style}>
+    <Animated.View entering={fadeIn} style={style}>
       {children}
     </Animated.View>
   );
@@ -22,43 +27,28 @@ export function Enter({ index = 0, children, style }: { index?: number; children
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/** A Pressable that sinks slightly while pressed. */
-export function PressableScale({ scaleTo = 0.97, hapticOnPress = true, style, onPressIn, onPressOut, onPress, ...rest }: PressableProps & { scaleTo?: number; hapticOnPress?: boolean }) {
+/** A Pressable that dims and sinks very slightly while pressed. Haptics are opt-in. */
+export function PressableScale({ scaleTo = 0.98, hapticOnPress = false, style, onPressIn, onPressOut, onPress, ...rest }: PressableProps & { scaleTo?: number; hapticOnPress?: boolean }) {
   const scale = useSharedValue(1);
   const [pressed, setPressed] = useState(false);
-  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
+  const target = Math.max(scaleTo, 0.96);
+  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }], opacity: 1 - (1 - scale.get()) * 4 }));
   // Animated components can't take a style function, so resolve it with our own pressed state.
   const resolved = typeof style === 'function' ? style({ pressed }) : style;
   return (
     <AnimatedPressable
       {...rest}
-      onPressIn={(e) => { setPressed(true); scale.set(withSpring(scaleTo, { damping: 20, stiffness: 400 })); onPressIn?.(e); }}
-      onPressOut={(e) => { setPressed(false); scale.set(withSpring(1, { damping: 14, stiffness: 300 })); onPressOut?.(e); }}
+      onPressIn={(e) => { setPressed(true); scale.set(withTiming(target, { duration: motion.fast, easing: ease })); onPressIn?.(e); }}
+      onPressOut={(e) => { setPressed(false); scale.set(withTiming(1, { duration: motion.base, easing: ease })); onPressOut?.(e); }}
       onPress={(e) => { if (hapticOnPress) haptic.tap(); onPress?.(e); }}
       style={[resolved, animated]}
     />
   );
 }
 
-/** Animates a number from its previous value to `value`. */
-export function useCountUp(value: number, duration = 600) {
-  const [shown, setShown] = useState(0);
-  useEffect(() => {
-    let frame = 0;
-    const from = shown;
-    const start = Date.now();
-    const step = () => {
-      const t = Math.min(1, (Date.now() - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setShown(Math.round(from + (value - from) * eased));
-      if (t < 1) frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
-    // Only re-run when the target changes; `shown` is the starting point.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, duration]);
-  return shown;
+/** Numbers render as-is; counting tickers read as gimmicky. Kept for API compatibility. */
+export function useCountUp(value: number) {
+  return value;
 }
 
 export { Animated };
