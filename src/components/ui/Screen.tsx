@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, gradients, spacing } from '../../constants/tokens';
 import { Text } from './Text';
@@ -11,6 +11,8 @@ export function Screen({ title, subtitle, right, children, footer }: { title?: s
   const items = React.Children.toArray(children).filter(Boolean);
   return (
     <SafeAreaView edges={['top']} style={styles.root}>
+      {/* Android draws edge-to-edge, so the window no longer resizes for the keyboard; shrink the scroll area instead. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {title ? (
           <Enter style={styles.header}>
@@ -25,6 +27,7 @@ export function Screen({ title, subtitle, right, children, footer }: { title?: s
           <Enter key={i}>{child}</Enter>
         ))}
       </ScrollView>
+      </KeyboardAvoidingView>
       {footer}
     </SafeAreaView>
   );

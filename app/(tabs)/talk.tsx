@@ -110,7 +110,7 @@ export default function TalkScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, backgroundImage: mode === 'voice' ? gradients.talk : gradients.screen }}>
       <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
           <View style={styles.header}>
             <RoundButton icon="arrowLeft" label="Back" onPress={() => (mode === 'voice' ? setMode('chat') : router.navigate('/'))} />
             <PressableScale onPress={() => setMode(mode === 'voice' ? 'chat' : 'voice')} style={styles.modelPill}>
