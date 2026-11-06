@@ -3,7 +3,7 @@ import { requestRecordingPermissionsAsync } from 'expo-audio';
 import { KippVoice as KippAudio, type ModelProgressEvent, type VoiceState, type VoiceStatus } from '../../modules/kipp-audio';
 import { useAppStore } from '../stores/appStore';
 import { runTurn } from './conversation';
-import { speakable } from './speech';
+import { speakable } from './speakable';
 import { notifications } from './notifications';
 
 // Hands-free KIPP: native code listens for "Hey KIPP", detects when you finish speaking and transcribes
