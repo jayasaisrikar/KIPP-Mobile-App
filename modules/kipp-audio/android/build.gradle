@@ -13,3 +13,17 @@ android {
     versionName "0.1.0"
   }
 }
+
+repositories {
+  mavenCentral()
+  // sherpa-onnx publishes its Android AAR through JitPack.
+  maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+  // On-device wake word, VAD, speech-to-text and neural TTS.
+  // Pinned to 1.13.x: 2.x removed espeak-ng, so Kokoro would silently skip words missing from its lexicon (names, "KIPP").
+  implementation 'com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v1.13.8'
+  // Unpacks the .tar.bz2 model archives on device.
+  implementation 'org.apache.commons:commons-compress:1.27.1'
+}

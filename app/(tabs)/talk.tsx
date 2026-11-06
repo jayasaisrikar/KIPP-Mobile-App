@@ -1,26 +1,24 @@
 import React, { useState, useRef } from 'react';
 import { View, ScrollView, TextInput, KeyboardAvoidingView, Platform, StyleSheet, type ScrollViewInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Speech from 'expo-speech';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, fonts, gradients, spacing } from '../../src/constants/tokens';
 import { Orb } from '../../src/components/kipp/Orb';
 import Animated from 'react-native-reanimated';
 import { fadeIn } from '../../src/components/ui/Motion';
-import { Button, Icon, PressableScale, Skeleton, Text, haptic, type IconName } from '../../src/components/ui';
+import { Button, Icon, PressableScale, Progress, Skeleton, Text, haptic, type IconName } from '../../src/components/ui';
 import { useAppStore } from '../../src/stores/appStore';
-import { askKipp, KippError } from '../../src/lib/kipp';
+import { runTurn } from '../../src/lib/conversation';
+import { speakReply, stopSpeaking } from '../../src/lib/speech';
+import { downloadVoiceModels, startHandsFree, stopHandsFree, useHandsFree, voiceStateLabel } from '../../src/lib/handsfree';
 import { commitAction, describeAction } from '../../src/lib/actions';
 import { useVoiceInput } from '../../src/lib/voice';
-import type { Message, ProposedAction } from '../../src/types';
-
-const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+import type { ProposedAction } from '../../src/types';
 
 const suggestions = ['Remind me to call mom at 6pm', 'Remember that I prefer window seats', 'Add a task to renew my passport'];
 
 export default function TalkScreen() {
   const messages = useAppStore((s) => s.messages);
-  const addMessage = useAppStore((s) => s.addMessage);
   const setMessages = useAppStore((s) => s.setMessages);
   const phase = useAppStore((s) => s.phase);
   const setPhase = useAppStore((s) => s.setPhase);
@@ -30,35 +28,38 @@ export default function TalkScreen() {
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<'voice' | 'chat'>('chat');
   const scrollRef = useRef<ScrollViewInstance>(null);
-  const canSend = input.trim().length > 0 && !busy;
+  const hf = useHandsFree();
+  const thinking = busy || (hf.listening && phase === 'thinking');
+  const canSend = input.trim().length > 0 && !thinking;
 
   const send = async (text: string) => {
-    if (!text.trim() || busy) return;
-    Speech.stop();
+    if (!text.trim() || thinking) return;
+    stopSpeaking();
     setError(null);
-    const userMsg: Message = { id: newId(), conversationId: 'local', role: 'user', content: text.trim(), createdAt: new Date().toISOString() };
-    addMessage(userMsg);
     setInput('');
     setBusy(true);
-    setPhase('thinking');
-    try {
-      const turn = await askKipp(useAppStore.getState().messages);
-      addMessage({ id: turn.turnId, conversationId: 'local', role: 'assistant', content: turn.reply, emotion: turn.emotion, actions: turn.proposedActions, createdAt: new Date().toISOString() });
-      if (turn.proposedActions.length) {
-        setPhase('action');
-      } else if (voiceEnabled && Platform.OS !== 'web') {
-        setPhase('speaking');
-        Speech.speak(turn.reply, { onDone: () => setPhase('idle'), onStopped: () => setPhase('idle'), onError: () => setPhase('idle') });
-      } else {
-        setPhase('idle');
-      }
-    } catch (e) {
-      setError(e instanceof KippError ? e.message : 'Something went wrong. Try again.');
+    const result = await runTurn(text);
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
       setPhase('idle');
-    } finally {
-      setBusy(false);
+    } else if (result.turn.proposedActions.length) {
+      setPhase('action');
+      if (voiceEnabled) speakReply(result.turn.reply);
+    } else if (voiceEnabled && Platform.OS !== 'web') {
+      speakReply(result.turn.reply);
+    } else {
+      setPhase('idle');
     }
   };
+
+  const toggleHandsFree = async () => {
+    if (hf.listening) { await stopHandsFree(); setPhase('idle'); return; }
+    stopSpeaking();
+    if (voice.listening) voice.stop();
+    await startHandsFree();
+  };
+  const handsFreeReady = hf.available && !!hf.models?.ready;
 
   const voice = useVoiceInput((text) => { setPhase('idle'); if (text) send(text); });
 
@@ -86,7 +87,8 @@ export default function TalkScreen() {
 
   const toggleVoice = async () => {
     if (voice.listening) { voice.stop(); return; }
-    Speech.stop();
+    if (hf.listening) { await stopHandsFree(); setPhase('idle'); return; } // one mic user at a time
+    stopSpeaking();
     setError(null);
     setPhase('listening');
     if (!(await voice.start())) setPhase('idle');
@@ -102,10 +104,10 @@ export default function TalkScreen() {
   }
 
   const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-  const transcript = voice.listening ? voice.transcript : lastUser?.content ?? '';
+  const transcript = voice.listening ? voice.transcript : hf.listening ? hf.lastHeard ?? '' : lastUser?.content ?? '';
   const words = transcript.split(' ');
 
-  const clear = () => { Speech.stop(); setMessages([]); useAppStore.getState().setConversationId(null); setError(null); setPhase('idle'); };
+  const clear = () => { stopSpeaking(); setMessages([]); useAppStore.getState().setConversationId(null); setError(null); setPhase('idle'); };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, backgroundImage: mode === 'voice' ? gradients.talk : gradients.screen }}>
@@ -137,16 +139,39 @@ export default function TalkScreen() {
                     ))}
                   </Text>
                 ) : (
-                  <Text style={[styles.transcript, { opacity: 0.55 }]}>Tap the mic and{'\n'}say anything.</Text>
+                  <Text style={[styles.transcript, { opacity: 0.55 }]}>
+                    {hf.listening ? voiceStateLabel(hf.state, hf.inConversation) : handsFreeReady ? 'Tap to go hands-free.\nThen just say "Hey KIPP".' : `Tap the mic and${'\n'}say anything.`}
+                  </Text>
                 )}
-                {voice.error ? <Text variant="bodySm" tone="destructive" style={{ textAlign: 'center', marginTop: spacing.md }}>{voice.error}</Text> : null}
+                {hf.listening && transcript ? (
+                  <Text variant="label" tone="muted" style={{ textAlign: 'center', marginTop: spacing.md }}>{voiceStateLabel(hf.state, hf.inConversation)}</Text>
+                ) : null}
+                {hf.available && !hf.models?.ready ? (
+                  <View style={styles.downloadCard}>
+                    <Text variant="label">Give KIPP ears and a real voice</Text>
+                    <Text variant="caption" tone="muted">Wake word, speech recognition and a natural voice, all running on this phone. One-time download of about 380 MB. Wi-Fi recommended.</Text>
+                    {hf.download.active ? (
+                      <Progress value={hf.download.fraction} label="Downloading" detail={`${Math.round(hf.download.fraction * 100)}%`} />
+                    ) : (
+                      <Button label={hf.download.error ? 'Retry download' : 'Download'} icon="sparkles" size="sm" onPress={downloadVoiceModels} />
+                    )}
+                    {hf.download.error ? <Text variant="caption" tone="destructive">{hf.download.error}</Text> : null}
+                  </View>
+                ) : null}
+                {voice.error || hf.error ? <Text variant="bodySm" tone="destructive" style={{ textAlign: 'center', marginTop: spacing.md }}>{voice.error || hf.error}</Text> : null}
               </View>
               <View style={styles.voiceControls}>
                 <RoundButton icon="scan" label="Clear" size={64} onPress={clear} />
                 <View style={styles.micRing}>
-                  <PressableScale scaleTo={0.96} hapticOnPress onPress={toggleVoice} accessibilityRole="button" accessibilityLabel={voice.listening ? 'Stop listening' : 'Talk to KIPP'} style={[styles.mic, voice.listening && { backgroundColor: colors.destructive }]}>
-                    <Icon name={voice.listening ? 'stop' : 'voice'} size={38} color={colors.white} />
-                  </PressableScale>
+                  {handsFreeReady ? (
+                    <PressableScale scaleTo={0.96} hapticOnPress onPress={toggleHandsFree} accessibilityRole="switch" accessibilityState={{ checked: hf.listening }} accessibilityLabel={hf.listening ? 'Turn off hands-free listening' : 'Turn on hands-free listening'} style={[styles.mic, hf.listening && { backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary }]}>
+                      <Icon name={hf.listening ? 'stop' : 'voice'} size={38} color={hf.listening ? colors.primary : colors.white} />
+                    </PressableScale>
+                  ) : (
+                    <PressableScale scaleTo={0.96} hapticOnPress onPress={toggleVoice} accessibilityRole="button" accessibilityLabel={voice.listening ? 'Stop listening' : 'Talk to KIPP'} style={[styles.mic, voice.listening && { backgroundColor: colors.destructive }]}>
+                      <Icon name={voice.listening ? 'stop' : 'voice'} size={38} color={colors.white} />
+                    </PressableScale>
+                  )}
                 </View>
                 <RoundButton icon="chat" label="Chat view" size={64} onPress={() => setMode('chat')} />
               </View>
@@ -202,7 +227,7 @@ export default function TalkScreen() {
                     </View>
                   );
                 })}
-                {busy && (
+                {thinking && (
                   <Animated.View entering={fadeIn} style={styles.kippRow}>
                     <View style={styles.avatar}><Icon name="sparkles" size={15} color={colors.white} /></View>
                     <View accessibilityLabel="KIPP is thinking" style={{ flex: 1, gap: 8, paddingTop: 10 }}>
@@ -237,7 +262,7 @@ export default function TalkScreen() {
                     returnKeyType="send"
                     multiline
                     submitBehavior="submit"
-                    editable={!busy && !voice.listening}
+                    editable={!thinking && !voice.listening}
                   />
                   <PressableScale onPress={() => send(input)} disabled={!canSend} accessibilityLabel="Send" style={[styles.send, !canSend && { opacity: 0.5 }]}>
                     <Icon name="paperplane" size={15} color={colors.white} />
@@ -303,15 +328,16 @@ const glass = { backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWi
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   round: { alignItems: 'center', justifyContent: 'center', ...glass },
-  modelPill: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 16, borderRadius: 999, backgroundColor: 'rgba(23,183,156,0.18)', borderWidth: StyleSheet.hairlineWidth * 2, borderColor: 'rgba(47,212,180,0.35)' },
+  modelPill: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 16, borderRadius: 999, backgroundColor: 'rgba(220,20,60,0.18)', borderWidth: StyleSheet.hairlineWidth * 2, borderColor: 'rgba(240,67,95,0.35)' },
   modelText: { fontFamily: fonts.regular, fontSize: 14, color: colors.foreground },
 
   voiceCenter: { alignItems: 'center', justifyContent: 'center', paddingTop: spacing.xxxl },
+  downloadCard: { marginTop: spacing.xl, padding: spacing.lg, gap: spacing.sm, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   transcriptWrap: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xxl },
   transcript: { fontFamily: fonts.regular, fontSize: 28, lineHeight: 42, letterSpacing: -0.8, textAlign: 'center', color: colors.foreground },
   voiceControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', paddingBottom: spacing.xl },
-  micRing: { width: 150, height: 150, borderRadius: 75, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: StyleSheet.hairlineWidth * 2, borderColor: 'rgba(255,255,255,0.06)', boxShadow: '0 0 40px rgba(23,183,156,0.25)' },
-  mic: { width: 108, height: 108, borderRadius: 54, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, boxShadow: '0 8px 30px rgba(23,183,156,0.55)' },
+  micRing: { width: 150, height: 150, borderRadius: 75, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: StyleSheet.hairlineWidth * 2, borderColor: 'rgba(255,255,255,0.06)', boxShadow: '0 0 40px rgba(220,20,60,0.25)' },
+  mic: { width: 108, height: 108, borderRadius: 54, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, boxShadow: '0 8px 30px rgba(220,20,60,0.55)' },
 
   thread: { padding: spacing.lg, paddingBottom: spacing.xl, flexGrow: 1, gap: spacing.md },
   empty: { alignItems: 'center', paddingTop: spacing.xl },
@@ -321,7 +347,7 @@ const styles = StyleSheet.create({
   userRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   userBubble: { maxWidth: '82%', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, ...glass },
   kippRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(23,183,156,0.3)' },
+  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(220,20,60,0.3)' },
   msgText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.foreground },
   errorCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 18, backgroundColor: colors.destructiveTint },
 

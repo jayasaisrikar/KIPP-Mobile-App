@@ -56,7 +56,7 @@ export default function HomeScreen() {
         <Text style={styles.heroTitle}>What can I do for{'\n'}you today?</Text>
         <PressableScale onPress={() => ask()} style={styles.heroCta}>
           <Text style={styles.heroCtaText}>Chat with KIPP</Text>
-          <Icon name="chevronRight" size={14} color="#0B1A1C" />
+          <Icon name="chevronRight" size={14} color="#2A0A12" />
         </PressableScale>
       </View>
 
@@ -149,11 +149,11 @@ const styles = StyleSheet.create({
   heroEyebrow: { fontFamily: fonts.regular, fontSize: 13, color: 'rgba(255,255,255,0.85)' },
   heroTitle: { fontFamily: fonts.regular, fontSize: 26, lineHeight: 34, color: colors.white, marginTop: 8, letterSpacing: -0.4 },
   heroCta: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginTop: 'auto', paddingHorizontal: 16, height: 38, borderRadius: 999, backgroundColor: colors.white },
-  heroCtaText: { fontFamily: fonts.medium, fontSize: 14, color: '#0B1A1C' },
+  heroCtaText: { fontFamily: fonts.medium, fontSize: 14, color: '#2A0A12' },
 
   tiles: { flexDirection: 'row', gap: spacing.md },
   tile: { flex: 1, height: 150, borderRadius: 20, padding: 16, justifyContent: 'space-between', ...glass },
-  tileIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(23,183,156,0.35)' },
+  tileIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(220,20,60,0.35)' },
   tileFoot: { flexDirection: 'row', alignItems: 'center' },
   tileTitle: { fontFamily: fonts.regular, fontSize: 16, color: colors.foreground },
   tileMeta: { fontFamily: fonts.regular, fontSize: 13, color: colors.mutedForeground, marginTop: 2 },

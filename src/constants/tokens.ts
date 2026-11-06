@@ -9,12 +9,12 @@ import Storage from '../lib/storage';
 
 // coss ui dark theme.
 const dark = {
-  // Deep teal-night palette with glassy surfaces.
+  // Deep night palette with crimson accents and glassy surfaces.
   background: '#080F1B',
   card: '#222933',
   popover: '#29333E',
   foreground: '#F2F7F7',
-  primary: '#00B89F',
+  primary: '#DC143C',
   primaryForeground: '#FFFFFF',
   secondary: 'rgba(255,255,255,0.07)',
   muted: 'rgba(255,255,255,0.05)',
@@ -22,7 +22,7 @@ const dark = {
   accent: 'rgba(255,255,255,0.09)', // hover / pressed surface
   border: 'rgba(255,255,255,0.09)',
   input: 'rgba(255,255,255,0.12)',
-  ring: '#00B89F',
+  ring: '#DC143C',
   destructive: '#F15757',
   destructiveForeground: '#F87171',
   destructiveTint: 'rgba(239,68,68,0.10)',
@@ -36,11 +36,11 @@ const dark = {
   warningForeground: '#FBBF24',
   warningTint: 'rgba(245,158,11,0.10)',
   // KIPP's own identity colour, used sparingly (face, listening state).
-  brand: '#2FD4B4',
-  brandTint: 'rgba(47,212,180,0.16)',
+  brand: '#F0435F',
+  brandTint: 'rgba(240,67,95,0.16)',
   // Pressed states and KIPP's face, which need per-theme values.
-  primaryPressed: '#129C85',
-  surfacePressed: '#1D2C31',
+  primaryPressed: '#B01030',
+  surfacePressed: '#2A1D22',
   destructivePressed: '#D94B4B',
   overlay: 'rgba(0,0,0,0.6)',
   skeleton: 'rgba(255,255,255,0.07)',
@@ -60,7 +60,7 @@ const light: Palette = {
   card: '#FFFFFF',
   popover: '#FFFFFF',
   foreground: '#262626', // neutral-800
-  primary: '#0FA58B',
+  primary: '#DC143C',
   primaryForeground: '#FFFFFF',
   secondary: 'rgba(0,0,0,0.04)',
   muted: 'rgba(0,0,0,0.04)',
@@ -81,9 +81,9 @@ const light: Palette = {
   warning: '#F59E0B',
   warningForeground: '#B45309',
   warningTint: 'rgba(245,158,11,0.10)',
-  brand: '#0FA58B',
-  brandTint: 'rgba(15,165,139,0.14)',
-  primaryPressed: '#0C8A74',
+  brand: '#DC143C',
+  brandTint: 'rgba(220,20,60,0.12)',
+  primaryPressed: '#B0102F',
   surfacePressed: '#F2F2F2',
   destructivePressed: '#DC2626',
   overlay: 'rgba(0,0,0,0.32)',
@@ -119,14 +119,14 @@ export const colors: Palette = scheme === 'light' ? light : dark;
 // Ambient screen wash and hero fills (CSS gradient strings, rendered natively via backgroundImage).
 export const gradients = scheme === 'light'
   ? {
-      screen: 'linear-gradient(180deg, #DDF5EF 0%, #FFFFFF 45%)',
-      hero: 'linear-gradient(135deg, #2CC9AD 0%, #0E8F7A 100%)',
-      talk: 'radial-gradient(circle at 50% 18%, #9FE6D7 0%, #E8F7F3 45%, #FFFFFF 85%)',
+      screen: 'linear-gradient(180deg, #FBE3E7 0%, #FFFFFF 45%)',
+      hero: 'linear-gradient(135deg, #E8344F 0%, #A50E2D 100%)',
+      talk: 'radial-gradient(circle at 50% 18%, #F5A3B1 0%, #FBEAED 45%, #FFFFFF 85%)',
     }
   : {
-      screen: 'radial-gradient(ellipse at 0% 0%, rgba(0,196,171,0.32) 0%, transparent 30%), radial-gradient(ellipse at 100% 100%, rgba(30,91,116,0.38) 0%, transparent 42%), linear-gradient(180deg, #080F1B 0%, #080F1B 100%)',
-      hero: 'linear-gradient(120deg, #08B89E 0%, #00C9AF 60%, #079F91 100%)',
-      talk: 'radial-gradient(ellipse at 18% 12%, #00C5AE 0%, rgba(0,163,149,0.75) 19%, transparent 51%), radial-gradient(ellipse at 100% 95%, #153B50 0%, transparent 42%), linear-gradient(180deg, #0B343C 0%, #080F1B 62%, #080F1B 100%)',
+      screen: 'radial-gradient(ellipse at 0% 0%, rgba(220,20,60,0.30) 0%, transparent 30%), radial-gradient(ellipse at 100% 100%, rgba(110,18,42,0.38) 0%, transparent 42%), linear-gradient(180deg, #080F1B 0%, #080F1B 100%)',
+      hero: 'linear-gradient(120deg, #C8102E 0%, #E0284A 60%, #9E0C28 100%)',
+      talk: 'radial-gradient(ellipse at 18% 12%, #D4173F 0%, rgba(170,16,48,0.75) 19%, transparent 51%), radial-gradient(ellipse at 100% 95%, #3B1520 0%, transparent 42%), linear-gradient(180deg, #3A0C17 0%, #080F1B 62%, #080F1B 100%)',
     };
 
 // coss --radius: 0.625rem → 10

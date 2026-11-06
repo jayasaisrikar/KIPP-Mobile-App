@@ -29,6 +29,27 @@ offers the phone microphone as an explicit choice. It never falls back silently.
   launch (removes files left by a test that was killed mid-recording). Android may also evict cache.
 - Leaving the foreground stops recording (`APP_BACKGROUNDED`). No foreground service exists.
 
+## Hands-free voice (`voice/`)
+
+```
+VoiceService (foreground service, type=microphone, "KIPP is listening" notification + Stop)
+  └─ VoiceEngine: AudioRecord 16 kHz ─► Silero VAD v5 ─┬─► wake-word spotter ("Hey/Hi/OK KIPP", GigaSpeech KWS)
+                                                       └─► segment ─► Moonshine base (int8) ─► onUtterance (JS)
+JS (src/lib/handsfree.ts) ─► runTurn() ─► KippAudio.speak(reply) ─► Speaker: Kokoro v1.0 int8 → AudioTrack
+```
+
+- **Addressing:** outside a conversation, speech is discarded unless the wake word was spotted in it.
+  After "Hey KIPP" the conversation stays open until 20 s of quiet or "stop / that's all / never mind".
+- **Turn-taking:** utterance ends after 0.8 s of silence; if the transcript ends mid-thought ("and", "um",
+  trailing comma) it waits 1.5 s more. Speaking again extends the wait.
+- **Echo:** on the phone speaker the mic is ignored while KIPP talks (+350 ms). With headphones, talking over
+  KIPP for 300 ms interrupts it (barge-in).
+- **Models** (~380 MB download, app-private `filesDir/kipp-voice/`): silero_vad_v5, kws-zipformer-gigaspeech-3.3M
+  (mobile), moonshine-base-en-int8, kokoro-int8-multi-lang-v1_0 (voice `af_heart`, sid 3).
+- **sherpa-onnx is pinned to v1.13.8:** 2.x removed espeak-ng, so Kokoro would silently drop words missing
+  from its lexicon (names, "KIPP").
+- Listening stops when the app is swiped away (`stopWithTask`); the AI turn runs in the app's JS.
+
 ## Next: offline STT
 
 Today STT can consume `RecordingResult.filePath` (PCM WAV, `sampleRate` in the result). For streaming, add a

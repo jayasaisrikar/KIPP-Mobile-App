@@ -10,6 +10,7 @@ import { Toaster } from '../src/components/ui';
 import { useAppStore } from '../src/stores/appStore';
 import { syncGoogle } from '../src/lib/sync';
 import { notifications } from '../src/lib/notifications';
+import { initHandsFree } from '../src/lib/handsfree';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -33,6 +34,7 @@ export default function RootLayout() {
     if (!ready) return;
     SplashScreen.hideAsync();
     syncGoogle().catch(() => {});
+    initHandsFree();
   }, [ready]);
 
   // Styles are built from the palette at startup, so follow system appearance changes by reloading.

@@ -14,8 +14,13 @@ import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kippaudio.voice.ModelStore
+import expo.modules.kippaudio.voice.VoiceEngine
+import expo.modules.kippaudio.voice.VoiceHub
+import expo.modules.kippaudio.voice.VoiceService
 import java.io.File
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicBoolean
 
 class KippAudioException(code: String, message: String) : CodedException(code, message, null)
 
@@ -37,6 +42,7 @@ class KippAudioModule : Module() {
   private var lastResult: Map<String, Any?>? = null
   private var deviceCallback: AudioDeviceCallback? = null
   private var commListener: Any? = null // AudioManager.OnCommunicationDeviceChangedListener (API 31+)
+  private var downloadCancel: AtomicBoolean? = null
 
   private val recordingsDir: File
     get() = File(context.cacheDir, "kipp-audio-test").apply { mkdirs() }
@@ -44,15 +50,21 @@ class KippAudioModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("KippAudio")
 
-    Events("onDevicesChanged", "onRecordingStatus", "onRouteEvent", "onRecordingFinished")
+    Events(
+      "onDevicesChanged", "onRecordingStatus", "onRouteEvent", "onRecordingFinished",
+      // Hands-free voice
+      "onVoiceState", "onWake", "onUtterance", "onSpeech", "onVoiceError", "onModelProgress",
+    )
 
     OnCreate {
       // Test recordings are throwaway. Anything left here comes from a test the app was killed during.
       deleteAllRecordingsInternal()
       registerDeviceObservers()
+      VoiceHub.emitter = { name, body -> sendEvent(name, body) }
     }
 
     OnDestroy {
+      VoiceHub.emitter = null
       synchronized(lock) { session }?.stop("APP_CLOSED", "KIPP closed during the test.")
       unregisterDeviceObservers()
     }
@@ -72,6 +84,9 @@ class KippAudioModule : Module() {
     AsyncFunction("startTest") { deviceId: String, sampleRate: Int, maxDurationMs: Int ->
       if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
         throw KippAudioException("PERMISSION_DENIED", "Microphone permission is not granted.")
+      }
+      if (VoiceHub.listening) {
+        throw KippAudioException("MIC_BUSY", "Hands-free listening is using the microphone. Turn it off in Talk to run this test.")
       }
       synchronized(lock) {
         if (session != null) throw KippAudioException("ALREADY_RECORDING", "A test is already recording.")
@@ -126,6 +141,99 @@ class KippAudioModule : Module() {
     AsyncFunction("deleteAllRecordings") {
       synchronized(lock) { lastResult = null }
       deleteAllRecordingsInternal()
+    }
+
+    // ---- Hands-free voice ----------------------------------------------------------------------
+
+    AsyncFunction("getVoiceStatus") {
+      val engine = VoiceHub.engine
+      mapOf(
+        "models" to ModelStore.status(context),
+        "downloading" to (downloadCancel != null),
+        "listening" to (engine != null),
+        "state" to (engine?.currentState ?: "stopped"),
+        "inConversation" to (engine?.conversationActive ?: false),
+      )
+    }
+
+    AsyncFunction("downloadVoiceModels") {
+      if (downloadCancel != null) return@AsyncFunction false
+      val cancel = AtomicBoolean(false)
+      downloadCancel = cancel
+      val ctx = context
+      Thread({
+        var lastEmit = 0L
+        try {
+          ModelStore.download(ctx, cancel) { pack, done, total ->
+            val now = SystemClock.elapsedRealtime()
+            if (pack == "done" || now - lastEmit > 250) {
+              lastEmit = now
+              sendEvent("onModelProgress", mapOf("pack" to pack, "downloaded" to done, "total" to total, "done" to false, "error" to null))
+            }
+          }
+          sendEvent("onModelProgress", mapOf("pack" to "done", "downloaded" to 1, "total" to 1, "done" to true, "error" to null))
+        } catch (e: Throwable) {
+          sendEvent("onModelProgress", mapOf("pack" to "error", "downloaded" to 0, "total" to 0, "done" to true, "error" to (e.message ?: "Download failed")))
+        } finally {
+          downloadCancel = null
+        }
+      }, "kipp-model-download").start()
+      true
+    }
+
+    AsyncFunction("cancelVoiceDownload") { downloadCancel?.set(true); Unit }
+
+    AsyncFunction("deleteVoiceModels") {
+      if (VoiceHub.listening) throw KippAudioException("MIC_BUSY", "Stop listening before deleting the voice models.")
+      ModelStore.delete(context)
+      true
+    }
+
+    AsyncFunction("startListening") { inputDeviceId: String?, patienceMs: Int? ->
+      if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        throw KippAudioException("PERMISSION_DENIED", "Microphone permission is not granted.")
+      }
+      if (!ModelStore.allReady(context)) throw KippAudioException("MODELS_MISSING", "Download KIPP's voice models first.")
+      if (synchronized(lock) { session } != null) throw KippAudioException("MIC_BUSY", "The audio device test is using the microphone.")
+      if (VoiceHub.listening) return@AsyncFunction true
+      VoiceHub.pendingConfig = VoiceEngine.Config(
+        inputDeviceId = inputDeviceId?.toIntOrNull(),
+        patienceMs = (patienceMs ?: 800).coerceIn(400, 2500),
+      )
+      VoiceService.start(context)
+      true
+    }
+
+    AsyncFunction("stopListening") { VoiceService.stop(context); true }
+
+    AsyncFunction("speak") { text: String ->
+      val engine = VoiceHub.engine
+      if (engine != null) {
+        engine.speak(text)
+      } else {
+        if (!ModelStore.isReady(context, "tts")) throw KippAudioException("MODELS_MISSING", "KIPP's voice isn't downloaded yet.")
+        VoiceHub.speaker(context).speak(
+          text,
+          onStart = { sendEvent("onSpeech", mapOf("status" to "start", "error" to null)) },
+          onDone = { completed, error ->
+            sendEvent("onSpeech", mapOf("status" to if (error != null) "error" else if (completed) "done" else "interrupted", "error" to error))
+          },
+        )
+      }
+      true
+    }
+
+    AsyncFunction("stopSpeaking") { VoiceHub.engine?.stopSpeaking() ?: VoiceHub.speaker(context).stop(); true }
+
+    AsyncFunction("replyFinished") { VoiceHub.engine?.replyFinished(); true }
+
+    AsyncFunction("endConversation") { VoiceHub.engine?.endConversation(); true }
+
+    AsyncFunction("setVoice") { voiceId: Int, speed: Double ->
+      val sp = VoiceHub.speaker(context)
+      sp.voiceId = voiceId.coerceIn(0, 52)
+      sp.speed = speed.toFloat().coerceIn(0.6f, 1.6f)
+      true
     }
   }
 

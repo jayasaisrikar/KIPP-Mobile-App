@@ -1,9 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <!-- Microphone capture for the user-started audio device test. -->
+  <!-- Microphone capture: the device test and hands-free listening. -->
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
   <!-- setMode / setCommunicationDevice / startBluetoothSco (normal permission, no prompt). -->
   <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-  <!-- Android 11 and lower only: required by startBluetoothSco(). Install-time, no prompt.
-       Android 12+ routing goes through setCommunicationDevice(), which needs no Bluetooth permission. -->
+  <!-- Android 11 and lower only: required by startBluetoothSco(). Install-time, no prompt. -->
   <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+  <!-- Hands-free listening keeps running behind other apps via a visible microphone foreground service. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+  <!-- First-run download of the on-device voice models. -->
+  <uses-permission android:name="android.permission.INTERNET" />
+
+  <application>
+    <!-- stopWithTask: the AI turn runs in the app, so listening ends when the app is swiped away. -->
+    <service
+      android:name="expo.modules.kippaudio.voice.VoiceService"
+      android:exported="false"
+      android:stopWithTask="true"
+      android:foregroundServiceType="microphone" />
+  </application>
 </manifest>
