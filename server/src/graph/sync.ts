@@ -25,10 +25,10 @@ export async function upsertTaskEdge(userId: string, taskId: string, title: stri
   const session = getDriver().session();
   try {
     await session.run(
-      `MERGE (t:Task {id: $taskId})
+      `MERGE (p:Person {id: $userId})
+       WITH p
+       MERGE (t:Task {id: $taskId})
        SET t.title = $title, t.status = $status, t.updatedAt = timestamp()
-       WITH t
-       MATCH (p:Person {id: $userId})
        MERGE (p)-[:OWNS]->(t)`,
       { taskId, title, status, userId },
     );
@@ -46,10 +46,10 @@ export async function upsertMemoryEdge(
   const session = getDriver().session();
   try {
     await session.run(
-      `MERGE (m:Memory {id: $memoryId})
+      `MERGE (p:Person {id: $userId})
+       WITH p
+       MERGE (m:Memory {id: $memoryId})
        SET m.text = $text, m.category = $category, m.updatedAt = timestamp()
-       WITH m
-       MATCH (p:Person {id: $userId})
        MERGE (p)-[:REMEMBERS]->(m)`,
       { memoryId, text, category, userId },
     );
