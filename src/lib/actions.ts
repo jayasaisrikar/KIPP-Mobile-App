@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { isRunningInExpoGo } from 'expo';
 import { notifications } from './notifications';
 import { taskSchema, reminderSchema, memorySchema, calendarEventSchema } from './schemas';
 import { useAppStore } from '../stores/appStore';
@@ -67,9 +68,10 @@ export async function commitAction(action: ProposedAction): Promise<string> {
     case 'reminder.create': {
       const args = reminderSchema.omit({ timezone: true }).parse(action.args);
       const r = await createReminder(args);
-      return r.notificationId || Platform.OS === 'web'
-        ? `Reminder set for ${new Date(r.triggerAt).toLocaleString()}.`
-        : 'Reminder saved, but notifications are off — enable them in system settings.';
+      if (r.notificationId) return `Reminder set for ${new Date(r.triggerAt).toLocaleString()}.`;
+      if (Platform.OS === 'web') return 'Reminder saved to Plans.';
+      if (isRunningInExpoGo()) return 'Reminder saved. Alerts need a development build, so none will fire in Expo Go.';
+      return 'Reminder saved, but notifications are off — enable them in system settings.';
     }
     case 'memory.save': {
       if (useAppStore.getState().user?.memoryEnabled === false) throw new Error('Memory is turned off in You → Memory.');
